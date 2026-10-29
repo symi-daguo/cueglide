@@ -202,25 +202,28 @@ struct PrompterView: View {
             Spacer()
 
             if viewModel.controlsVisible {
-                controlBar
+                controlBar(isLandscape: size.width > size.height)
                     .padding(.horizontal, 16)
-                    .padding(.bottom, 44)
+                    .padding(.bottom, size.width > size.height ? 12 : 44)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
         .foregroundStyle(Color(uiColor: viewModel.display.palette.foreground))
     }
 
-    private var controlBar: some View {
-        VStack(spacing: 9) {
+    private func controlBar(isLandscape: Bool) -> some View {
+        let compact = isLandscape
+        return VStack(spacing: compact ? 6 : 9) {
             HStack(spacing: 6) {
-                Text(viewModel.script.title.isEmpty ? "未命名台本" : viewModel.script.title)
-                    .font(.system(size: 11, weight: .medium))
-                    .lineLimit(1)
-                    .layoutPriority(1)
-                Text("·").opacity(0.4)
+                if !compact {
+                    Text(viewModel.script.title.isEmpty ? "未命名台本" : viewModel.script.title)
+                        .font(.system(size: 11, weight: .medium))
+                        .lineLimit(1)
+                        .layoutPriority(1)
+                    Text("·").opacity(0.4)
+                }
                 Text(viewModel.progressLabel)
-                    .font(.system(size: 11).monospacedDigit())
+                    .font(.system(size: compact ? 10 : 11).monospacedDigit())
                 Spacer(minLength: 4)
                 if viewModel.remote.isConnected {
                     Image(systemName: "keyboard")
@@ -234,7 +237,7 @@ struct PrompterView: View {
             }
             .padding(.horizontal, 2)
 
-            progressBar
+            progressBar(compact: compact)
 
             if viewModel.isVoiceActive {
                 voiceStatusRow
@@ -248,12 +251,13 @@ struct PrompterView: View {
                 speedSlider
             }
 
-            HStack(spacing: 8) {
-                controlButton("backward.end.fill", caption: "回顶") {
+            HStack(spacing: compact ? 6 : 8) {
+                controlButton(compact: compact, "backward.end.fill", caption: "回顶") {
                     viewModel.restart()
                 }
                 .accessibilityLabel("回到开头")
                 controlButton(
+                    compact: compact,
                     viewModel.engine.isRunning ? "pause.fill" : "play.fill",
                     prominent: true
                 ) {
@@ -262,11 +266,12 @@ struct PrompterView: View {
                 .accessibilityLabel(viewModel.engine.isRunning ? "暂停" : "播放")
                 .opacity(viewModel.scroll.mode == .voice ? 0.4 : 1)
                 .disabled(viewModel.scroll.mode == .voice)
-                controlButton("waveform", caption: "跟读", active: viewModel.isVoiceActive) {
+                controlButton(compact: compact, "waveform", caption: "跟读", active: viewModel.isVoiceActive) {
                     viewModel.toggleVoice()
                 }
                 .accessibilityLabel(viewModel.isVoiceActive ? "关闭语音跟读" : "开启语音跟读")
                 controlButton(
+                    compact: compact,
                     "character",
                     caption: "\(Int(viewModel.display.fontSize))",
                     active: viewModel.adjustTarget == .fontSize
@@ -275,6 +280,7 @@ struct PrompterView: View {
                 }
                 .accessibilityLabel("调整字号，当前 \(Int(viewModel.display.fontSize)) 磅")
                 controlButton(
+                    compact: compact,
                     "speedometer",
                     caption: viewModel.scroll.speedLabel,
                     active: viewModel.adjustTarget == .speed
@@ -284,7 +290,12 @@ struct PrompterView: View {
                 .accessibilityLabel("调整速度，当前 \(viewModel.scroll.speedLabel)")
             }
         }
-        .padding(12)
+        .padding(compact ? 9 : 12)
+        // 控制条下面就是提词正文，纯玻璃会把字透上来，垫一层深色再叠玻璃
+        .background(
+            Color(uiColor: viewModel.display.palette.background).opacity(0.72),
+            in: .rect(cornerRadius: 22)
+        )
         .glassEffect(.regular, in: .rect(cornerRadius: 22))
         .animation(.smooth(duration: 0.2), value: viewModel.adjustTarget)
         .animation(.smooth(duration: 0.2), value: viewModel.isVoiceActive)
@@ -296,7 +307,7 @@ struct PrompterView: View {
     }
 
     /// 细进度条，整行都可点可拖。系统 Slider 太粗，会把控制条撑高。
-    private var progressBar: some View {
+    private func progressBar(compact: Bool) -> some View {
         GeometryReader { geo in
             ZStack(alignment: .leading) {
                 Capsule()
@@ -319,7 +330,7 @@ struct PrompterView: View {
                     }
             )
         }
-        .frame(height: 26)
+        .frame(height: compact ? 18 : 26)
         .accessibilityElement()
         .accessibilityLabel("阅读进度")
         .accessibilityValue("\(Int(viewModel.engine.progress * 100)) %")
@@ -414,6 +425,7 @@ struct PrompterView: View {
     }
 
     private func controlButton(
+        compact: Bool = false,
         _ symbol: String,
         caption: String? = nil,
         active: Bool = false,
@@ -421,7 +433,7 @@ struct PrompterView: View {
         action: @escaping () -> Void
     ) -> some View {
         Button(action: action) {
-            VStack(spacing: 2) {
+            VStack(spacing: 1) {
                 Image(systemName: symbol)
                     .font(.system(size: prominent ? 19 : 15, weight: .semibold))
                 if let caption {
@@ -432,7 +444,7 @@ struct PrompterView: View {
                 }
             }
             .frame(maxWidth: .infinity)
-            .frame(height: 52)
+            .frame(height: compact ? 40 : 52)
             .foregroundStyle(foreground(prominent: prominent, active: active))
             .background {
                 RoundedRectangle(cornerRadius: 14, style: .continuous)

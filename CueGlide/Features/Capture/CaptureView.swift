@@ -63,35 +63,13 @@ struct CaptureView: View {
                     startPoint: .top,
                     endPoint: .bottom
                 )
-                .frame(height: 220)
+                .frame(height: 260)
                 .allowsHitTesting(false)
             }
             .allowsHitTesting(false)
     }
 
     // MARK: - 相机不可用
-
-    private var unavailableNotice: some View {
-        HStack(alignment: .top, spacing: 10) {
-            Image(systemName: "camera.metering.unknown")
-                .font(.system(size: 14, weight: .medium))
-            VStack(alignment: .leading, spacing: 2) {
-                Text("相机用不了，仍可读稿")
-                    .font(.system(size: 12, weight: .semibold))
-                if case .failed(let message) = viewModel.phase {
-                    Text(message)
-                        .font(.system(size: 11))
-                        .fixedSize(horizontal: false, vertical: true)
-                        .opacity(0.8)
-                }
-            }
-            Spacer(minLength: 0)
-        }
-        .foregroundStyle(.white)
-        .padding(12)
-        .background(.black.opacity(0.78), in: .rect(cornerRadius: 12))
-        .padding(.horizontal, 16)
-    }
 
     // MARK: - 顶部与底部
 
@@ -123,6 +101,20 @@ struct CaptureView: View {
                     .background(.black.opacity(0.45), in: .capsule)
                 }
 
+                if !viewModel.isAvailable {
+                    HStack(spacing: 5) {
+                        Image(systemName: "camera.metering.unknown")
+                            .font(.system(size: 11, weight: .medium))
+                        Text("相机不可用")
+                            .font(.system(size: 11, weight: .medium))
+                    }
+                    .foregroundStyle(.white.opacity(0.85))
+                    .padding(.horizontal, 10)
+                    .frame(height: 28)
+                    .background(.black.opacity(0.5), in: .capsule)
+                    .accessibilityLabel("相机不可用，仍可读稿但不能录制")
+                }
+
                 Spacer()
 
                 Button {
@@ -143,11 +135,6 @@ struct CaptureView: View {
             .padding(.top, 54)
 
             Spacer()
-
-            if !viewModel.isAvailable {
-                unavailableNotice
-                    .padding(.bottom, 10)
-            }
 
             if let message = viewModel.lastSavedMessage {
                 Text(message)
@@ -194,6 +181,7 @@ struct CaptureView: View {
             }
         }
         .padding(14)
+        .background(.black.opacity(0.68), in: .rect(cornerRadius: 24))
         .glassEffect(.regular, in: .rect(cornerRadius: 24))
     }
 

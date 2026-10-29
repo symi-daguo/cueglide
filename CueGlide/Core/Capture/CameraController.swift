@@ -46,6 +46,8 @@ final class CameraController: NSObject, @unchecked Sendable {
     /// 用锁保护跨队列读写的少量标量，录制写入器本身只在 captureQueue 上被操作。
     private let stateLock = NSLock()
     private var _writer: RecordingWriter?
+    /// 已按下录制但还没收到第一帧，等拿到真实画面尺寸再建写入器。
+    private var _pendingRecordingURL: URL?
     private var _position: AVCaptureDevice.Position = .front
     private var _isConfigured = false
 
@@ -64,7 +66,20 @@ final class CameraController: NSObject, @unchecked Sendable {
     var isRecording: Bool {
         stateLock.lock()
         defer { stateLock.unlock() }
-        return _writer != nil
+        return _writer != nil || _pendingRecordingURL != nil
+    }
+
+    private var pendingRecordingURL: URL? {
+        get {
+            stateLock.lock()
+            defer { stateLock.unlock() }
+            return _pendingRecordingURL
+        }
+        set {
+            stateLock.lock()
+            _pendingRecordingURL = newValue
+            stateLock.unlock()
+        }
     }
 
     private var writer: RecordingWriter? {
@@ -247,30 +262,14 @@ final class CameraController: NSObject, @unchecked Sendable {
 
     // MARK: - 录制
 
+    /// 只登记待录制的目标文件。真正的写入器要等第一帧到达，用画面的真实像素尺寸来建，
+    /// 否则写死分辨率会让成片被拉伸。
     func startRecording() async throws {
         guard isConfigured else { throw CaptureError.cannotConfigure }
 
-        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-            captureQueue.async { [weak self] in
-                guard let self else {
-                    continuation.resume()
-                    return
-                }
-                do {
-                    let url = FileManager.default.temporaryDirectory
-                        .appendingPathComponent("cueglide-\(Int(Date().timeIntervalSince1970)).mov")
-                    let newWriter = try RecordingWriter(
-                        outputURL: url,
-                        videoSize: CGSize(width: 1080, height: 1920)
-                    )
-                    self.writer = newWriter
-                    newWriter.start()
-                    continuation.resume()
-                } catch {
-                    continuation.resume(throwing: error)
-                }
-            }
-        }
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("cueglide-\(Int(Date().timeIntervalSince1970)).mov")
+        pendingRecordingURL = url
     }
 
     func stopRecording() async -> URL? {
@@ -301,10 +300,38 @@ extension CameraController: AVCaptureVideoDataOutputSampleBufferDelegate,
         from connection: AVCaptureConnection
     ) {
         if output === videoOutput {
+            beginWriterIfNeeded(with: sampleBuffer)
             writer?.appendVideo(sampleBuffer)
         } else if output === audioOutput {
             writer?.appendAudio(sampleBuffer)
             onAudioSample?(sampleBuffer)
+        }
+    }
+}
+
+// MARK: - 首帧建写入器
+
+extension CameraController {
+
+    /// 用第一帧视频的真实宽高创建写入器。相机按设备方向旋转后输出的像素尺寸
+    /// 由 connection 决定，不能假设固定比例。
+    fileprivate func beginWriterIfNeeded(with sampleBuffer: CMSampleBuffer) {
+        guard writer == nil,
+              let url = pendingRecordingURL,
+              let format = CMSampleBufferGetFormatDescription(sampleBuffer) else { return }
+
+        let dimensions = CMVideoFormatDescriptionGetDimensions(format)
+        guard dimensions.width > 0, dimensions.height > 0 else { return }
+
+        pendingRecordingURL = nil
+        let size = CGSize(width: CGFloat(dimensions.width), height: CGFloat(dimensions.height))
+        do {
+            let newWriter = try RecordingWriter(outputURL: url, videoSize: size)
+            writer = newWriter
+            newWriter.start()
+        } catch {
+            // 建不起来就把临时文件清掉，界面会因为没有写入器而回到未录制状态
+            try? FileManager.default.removeItem(at: url)
         }
     }
 }

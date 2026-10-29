@@ -7,6 +7,10 @@ struct HomeView: View {
     let onOpenTemplates: () -> Void
 
     @Environment(AppSettings.self) private var settings
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
+
+    /// 横屏时纵向空间只有一半，卡片要收得更紧，否则一屏只看得见两个入口。
+    private var isCompactHeight: Bool { verticalSizeClass == .compact }
     @Query(sort: [SortDescriptor(\Script.updatedAt, order: .reverse)]) private var scripts: [Script]
     @State private var request: PrompterRequest?
     @State private var showsFloating = false
@@ -23,7 +27,7 @@ struct HomeView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: 18) {
+                VStack(alignment: .leading, spacing: isCompactHeight ? 12 : 18) {
                     header
                     if let latest {
                         heroCard(latest)
@@ -103,7 +107,7 @@ struct HomeView: View {
     // MARK: - 主卡
 
     private func heroCard(_ script: Script) -> some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: isCompactHeight ? 10 : 16) {
             HStack(spacing: 6) {
                 Image(systemName: "clock.arrow.circlepath")
                     .font(.system(size: 11, weight: .semibold))
@@ -113,7 +117,7 @@ struct HomeView: View {
             .foregroundStyle(Theme.textSecondary)
 
             Text(script.title.isEmpty ? "未命名台本" : script.title)
-                .font(.system(size: 20, weight: .semibold))
+                .font(.system(size: isCompactHeight ? 17 : 20, weight: .semibold))
                 .foregroundStyle(Theme.textPrimary)
                 .lineLimit(2)
                 .multilineTextAlignment(.leading)
@@ -121,7 +125,7 @@ struct HomeView: View {
             Text(script.preview)
                 .font(Theme.captionFont)
                 .foregroundStyle(Theme.textSecondary)
-                .lineLimit(2)
+                .lineLimit(isCompactHeight ? 1 : 2)
                 .multilineTextAlignment(.leading)
 
             HStack(spacing: 12) {
@@ -148,7 +152,7 @@ struct HomeView: View {
                 .accessibilityLabel("开始提词：\(script.title.isEmpty ? "未命名台本" : script.title)")
             }
         }
-        .padding(20)
+        .padding(isCompactHeight ? 16 : 20)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Theme.surface, in: .rect(cornerRadius: Theme.cardRadius))
         .overlay {
@@ -166,7 +170,7 @@ struct HomeView: View {
                 .font(Theme.captionFont)
                 .foregroundStyle(Theme.textSecondary)
         }
-        .padding(20)
+        .padding(isCompactHeight ? 16 : 20)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Theme.surface, in: .rect(cornerRadius: Theme.cardRadius))
         .overlay {

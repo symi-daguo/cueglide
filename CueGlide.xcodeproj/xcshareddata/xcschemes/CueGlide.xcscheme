@@ -64,6 +64,17 @@
                ReferencedContainer = "container:CueGlide.xcodeproj">
             </BuildableReference>
          </TestableReference>
+         <TestableReference
+            skipped = "NO"
+            parallelizable = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "C61304FC6ED8559A3273E661"
+               BuildableName = "CueGlideUITests.xctest"
+               BlueprintName = "CueGlideUITests"
+               ReferencedContainer = "container:CueGlide.xcodeproj">
+            </BuildableReference>
+         </TestableReference>
       </Testables>
       <CommandLineArguments>
       </CommandLineArguments>
