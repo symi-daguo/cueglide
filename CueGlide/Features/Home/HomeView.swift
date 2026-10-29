@@ -10,6 +10,7 @@ struct HomeView: View {
     @Query(sort: [SortDescriptor(\Script.updatedAt, order: .reverse)]) private var scripts: [Script]
     @State private var request: PrompterRequest?
     @State private var showsFloating = false
+    @State private var showsCapture = false
 
     private var latest: Script? { scripts.first }
 
@@ -48,9 +49,22 @@ struct HomeView: View {
                     try? await Task.sleep(for: .milliseconds(400))
                     showsFloating = true
                 }
+                if ProcessInfo.processInfo.arguments.contains("-openCapture") {
+                    try? await Task.sleep(for: .milliseconds(400))
+                    showsCapture = true
+                }
             }
             .sheet(isPresented: $showsFloating) {
                 FloatingPrompterView()
+            }
+            .fullScreenCover(isPresented: $showsCapture) {
+                if let latest {
+                    CaptureView(
+                        script: latest,
+                        display: settings.display,
+                        scroll: settings.scroll
+                    )
+                }
             }
             .fullScreenCover(item: $request) { request in
                 PrompterView(
@@ -163,7 +177,10 @@ struct HomeView: View {
     // MARK: - 快捷入口
 
     private var quickActions: some View {
-        HStack(spacing: 12) {
+        LazyVGrid(
+            columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)],
+            spacing: 12
+        ) {
             quickCard(
                 title: "全屏提词",
                 subtitle: "纯净阅读",
@@ -189,6 +206,16 @@ struct HomeView: View {
             }
 
             quickCard(
+                title: "提词拍摄",
+                subtitle: "边读边录",
+                symbol: "camera.fill",
+                tint: Theme.accentOrange,
+                symbolColor: Color(uiColor: UIColor(rgb: 0xD85A30))
+            ) {
+                showsCapture = true
+            }
+
+            quickCard(
                 title: "悬浮提词",
                 subtitle: "浮在相机之上",
                 symbol: "pip.fill",
@@ -209,13 +236,10 @@ struct HomeView: View {
         action: @escaping () -> Void
     ) -> some View {
         Button(action: action) {
-            VStack(alignment: .leading, spacing: 8) {
-                HStack {
-                    Image(systemName: symbol)
-                        .font(.system(size: 18, weight: .semibold))
-                        .foregroundStyle(symbolColor)
-                    Spacer()
-                }
+            VStack(alignment: .leading, spacing: 0) {
+                Image(systemName: symbol)
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(symbolColor)
                 Spacer(minLength: 0)
                 Text(title)
                     .font(.system(size: 14, weight: .semibold))
@@ -224,9 +248,10 @@ struct HomeView: View {
                     .font(.system(size: 11))
                     .foregroundStyle(Theme.textSecondary)
                     .lineLimit(1)
+                    .padding(.top, 2)
             }
-            .padding(16)
-            .frame(maxWidth: .infinity, minHeight: 122, alignment: .leading)
+            .padding(14)
+            .frame(maxWidth: .infinity, minHeight: 96, alignment: .leading)
             .background(tint, in: .rect(cornerRadius: 16))
         }
         .buttonStyle(.plain)

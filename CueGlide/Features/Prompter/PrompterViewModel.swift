@@ -33,13 +33,13 @@ final class PrompterViewModel {
     @ObservationIgnored private var hideControlsTask: Task<Void, Never>?
     @ObservationIgnored private var lastKnownToken: Int = 0
 
-    init(script: Script, display: DisplayConfig, scroll: ScrollConfig) {
+    init(script: Script, display: DisplayConfig, scroll: ScrollConfig, captureMode: Bool = false) {
         self.script = script
         let tokenized = ScriptTokenizer.tokenize(script.body)
         self.tokenized = tokenized
         self.display = display
         self.scroll = scroll
-        self.renderer = PrompterRenderer(tokenized: tokenized, config: display)
+        self.renderer = PrompterRenderer(tokenized: tokenized, config: display, captureMode: captureMode)
         self.lastKnownToken = min(max(script.lastReadTokenIndex, 0), max(tokenized.totalTokens - 1, 0))
 
         engine.config = scroll

@@ -53,6 +53,8 @@ final class PrompterRenderer {
 
     private(set) var tokenized: TokenizedScript
     private(set) var config: DisplayConfig
+    /// 拍摄模式：透明背景 + 白字 + 描边阴影，叠在相机画面上也能看清。
+    private let captureMode: Bool
     private(set) var metrics = Metrics()
     private var lines: [LineInfo] = []
     private var lastCurrentToken: Int = -1
@@ -60,9 +62,10 @@ final class PrompterRenderer {
     private var lastLayoutWidth: CGFloat = 0
     private var viewportHeight: CGFloat = 0
 
-    init(tokenized: TokenizedScript, config: DisplayConfig) {
+    init(tokenized: TokenizedScript, config: DisplayConfig, captureMode: Bool = false) {
         self.tokenized = tokenized
         self.config = config
+        self.captureMode = captureMode
 
         // 提词需要全篇精确坐标，用 TextKit 1 的 NSLayoutManager 一次性测量更直接。
         let host = PrompterHostView()
@@ -112,7 +115,7 @@ final class PrompterRenderer {
 
     private func rebuildText(width: CGFloat = 0) {
         lastLayoutWidth = width
-        textView.backgroundColor = config.palette.background
+        textView.backgroundColor = captureMode ? .clear : config.palette.background
         textView.textContainerInset = insets(for: viewportHeight, width: width)
 
         let paragraph = NSMutableParagraphStyle()
@@ -121,11 +124,19 @@ final class PrompterRenderer {
         paragraph.lineBreakMode = .byWordWrapping
 
         let font = UIFont.systemFont(ofSize: config.fontSize, weight: config.fontWeight.uiWeight)
-        let attributes: [NSAttributedString.Key: Any] = [
+        var attributes: [NSAttributedString.Key: Any] = [
             .font: font,
             .foregroundColor: config.palette.foreground,
             .paragraphStyle: paragraph
         ]
+        if captureMode {
+            attributes[.foregroundColor] = UIColor.white
+            let shadow = NSShadow()
+            shadow.shadowColor = UIColor.black.withAlphaComponent(0.85)
+            shadow.shadowBlurRadius = 6
+            shadow.shadowOffset = CGSize(width: 0, height: 1)
+            attributes[.shadow] = shadow
+        }
 
         textView.attributedText = NSAttributedString(string: tokenized.source, attributes: attributes)
         lastCurrentToken = -1
@@ -293,10 +304,12 @@ final class PrompterRenderer {
         let current = min(max(currentToken, 0), tokenized.tokens.count - 1)
         guard current != lastCurrentToken else { return }
 
-        let dimColor = config.palette.foreground.withAlphaComponent(config.dimReadOpacity)
-        let baseColor = config.palette.foreground
-        let highlightColor = config.palette.highlight
-        let highlightBackground = config.palette.highlight.withAlphaComponent(0.16)
+        let baseColor = captureMode ? UIColor.white : config.palette.foreground
+        let dimColor = baseColor.withAlphaComponent(config.dimReadOpacity)
+        let highlightColor = captureMode ? UIColor(red: 0.55, green: 0.72, blue: 1, alpha: 1) : config.palette.highlight
+        let highlightBackground = captureMode
+            ? UIColor(red: 0.29, green: 0.43, blue: 0.96, alpha: 0.45)
+            : config.palette.highlight.withAlphaComponent(0.16)
 
         storage.beginEditing()
 
