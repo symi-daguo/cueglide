@@ -28,8 +28,10 @@
 		7804DC4905893DC9DCF3F777 /* FloatingFrameRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88CB044AD3908283267B655C /* FloatingFrameRenderer.swift */; };
 		838BC729DF5FCE2DEAB1D42C /* ScriptListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3CF893D46050A8FCF154D637 /* ScriptListView.swift */; };
 		84A87A2BFDA8A4CD88F62A45 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30F7E6C6F3D48C5097BA9E01 /* Theme.swift */; };
+		8A8E566FD35C3B06D89DBD9E /* ScriptImporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46FE0EB6A998A83A57D0FA9F /* ScriptImporter.swift */; };
 		913EC282D5F092B7EBC1804E /* CueGlideApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 85A9A173815E50148C712545 /* CueGlideApp.swift */; };
 		92EC484FD4F2E39C05FF957C /* ScriptAlignerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52D73D4563133D6A8C364707 /* ScriptAlignerTests.swift */; };
+		973486D189307B454B5D11B2 /* ScriptImporterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D92415132CB7D9DF1828239 /* ScriptImporterTests.swift */; };
 		A4EAEE1DD949317158D88F42 /* ScrollEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = B18BF6DDF02ADF985D9F6324 /* ScrollEngine.swift */; };
 		B0AC3F7370005C70D8BFF1BD /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D7CFF61518D1201B8E7D0B9 /* RootView.swift */; };
 		C47C06184424989A62998DD5 /* ScriptTokenizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8800E2F8CEB795EF76639BDC /* ScriptTokenizer.swift */; };
@@ -61,10 +63,12 @@
 		3A472A5BFE65A1E8BE596C33 /* ScriptEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScriptEditorView.swift; sourceTree = "<group>"; };
 		3CF893D46050A8FCF154D637 /* ScriptListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScriptListView.swift; sourceTree = "<group>"; };
 		448B56BEC52A887104635AE7 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		46FE0EB6A998A83A57D0FA9F /* ScriptImporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScriptImporter.swift; sourceTree = "<group>"; };
 		50EC4C55AF543131DEFA5EC3 /* PrompterViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrompterViewModel.swift; sourceTree = "<group>"; };
 		52D73D4563133D6A8C364707 /* ScriptAlignerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScriptAlignerTests.swift; sourceTree = "<group>"; };
 		52E149ABE9791095B162570A /* RemoteController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteController.swift; sourceTree = "<group>"; };
 		68D85B27204428A9E22C05C7 /* ScriptAligner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScriptAligner.swift; sourceTree = "<group>"; };
+		6D92415132CB7D9DF1828239 /* ScriptImporterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScriptImporterTests.swift; sourceTree = "<group>"; };
 		6FC296C6FABC4B668D086983 /* CaptureView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureView.swift; sourceTree = "<group>"; };
 		731E54652F46F1EB8B920B8F /* CameraController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraController.swift; sourceTree = "<group>"; };
 		7326E8DBDE9DC17176A2DE51 /* PrompterView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrompterView.swift; sourceTree = "<group>"; };
@@ -135,6 +139,7 @@
 				F1E2BEE79DFA51F4C05A05B0 /* PromptConfig.swift */,
 				FC0F7CB91E50D109350E0D69 /* SampleText.swift */,
 				276D08B2A164067D268F7FD0 /* Script.swift */,
+				46FE0EB6A998A83A57D0FA9F /* ScriptImporter.swift */,
 				B5D7DF1718DB3EE9B9FAF98D /* ScriptTemplate.swift */,
 			);
 			path = Models;
@@ -195,6 +200,7 @@
 			isa = PBXGroup;
 			children = (
 				52D73D4563133D6A8C364707 /* ScriptAlignerTests.swift */,
+				6D92415132CB7D9DF1828239 /* ScriptImporterTests.swift */,
 			);
 			path = CueGlideTests;
 			sourceTree = "<group>";
@@ -380,6 +386,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				92EC484FD4F2E39C05FF957C /* ScriptAlignerTests.swift in Sources */,
+				973486D189307B454B5D11B2 /* ScriptImporterTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -407,6 +414,7 @@
 				1EBC81C1A2BDF8A328BCEF4E /* Script.swift in Sources */,
 				6878C6E7A2FF001831F9726A /* ScriptAligner.swift in Sources */,
 				5CD6137658625D632AC2FDEC /* ScriptEditorView.swift in Sources */,
+				8A8E566FD35C3B06D89DBD9E /* ScriptImporter.swift in Sources */,
 				838BC729DF5FCE2DEAB1D42C /* ScriptListView.swift in Sources */,
 				04D227C33A6A552BDB89AF53 /* ScriptTemplate.swift in Sources */,
 				C47C06184424989A62998DD5 /* ScriptTokenizer.swift in Sources */,
@@ -479,7 +487,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 0.4.0;
+				MARKETING_VERSION = 0.5.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -548,7 +556,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 0.4.0;
+				MARKETING_VERSION = 0.5.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;

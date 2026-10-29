@@ -234,9 +234,7 @@ struct PrompterView: View {
             }
             .padding(.horizontal, 2)
 
-            ProgressView(value: viewModel.engine.progress)
-                .tint(Color(uiColor: viewModel.display.palette.highlight))
-                .progressViewStyle(.linear)
+            progressBar
 
             if viewModel.isVoiceActive {
                 voiceStatusRow
@@ -294,6 +292,47 @@ struct PrompterView: View {
             PrompterSettingsSheet(viewModel: viewModel)
                 .presentationDetents([.medium, .large])
                 .presentationBackground(.regularMaterial)
+        }
+    }
+
+    /// 细进度条，整行都可点可拖。系统 Slider 太粗，会把控制条撑高。
+    private var progressBar: some View {
+        GeometryReader { geo in
+            ZStack(alignment: .leading) {
+                Capsule()
+                    .fill(Color(uiColor: viewModel.display.palette.foreground).opacity(0.18))
+                    .frame(height: 5)
+                Capsule()
+                    .fill(Color(uiColor: viewModel.display.palette.highlight))
+                    .frame(width: max(geo.size.width * viewModel.engine.progress, 5), height: 5)
+            }
+            .frame(maxHeight: .infinity, alignment: .center)
+            .contentShape(Rectangle())
+            .gesture(
+                DragGesture(minimumDistance: 0)
+                    .onChanged { value in
+                        viewModel.handleScrub(true)
+                        viewModel.seek(toProgress: value.location.x / max(geo.size.width, 1))
+                    }
+                    .onEnded { _ in
+                        viewModel.handleScrub(false)
+                    }
+            )
+        }
+        .frame(height: 26)
+        .accessibilityElement()
+        .accessibilityLabel("阅读进度")
+        .accessibilityValue("\(Int(viewModel.engine.progress * 100)) %")
+        .accessibilityAdjustableAction { direction in
+            let step = 0.05
+            switch direction {
+            case .increment:
+                viewModel.seek(toProgress: viewModel.engine.progress + step)
+            case .decrement:
+                viewModel.seek(toProgress: viewModel.engine.progress - step)
+            @unknown default:
+                break
+            }
         }
     }
 

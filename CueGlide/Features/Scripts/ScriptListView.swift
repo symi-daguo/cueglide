@@ -27,6 +27,8 @@ struct ScriptListView: View {
     @State private var editingScript: Script?
     @State private var activeScript: Script?
     @State private var pendingDelete: Script?
+    @State private var showingImporter = false
+    @State private var importError: String?
 
     private var filtered: [Script] {
         var list = scripts
@@ -86,6 +88,12 @@ struct ScriptListView: View {
                         Button("新建台本", systemImage: "plus") {
                             createScript()
                         }
+                        Button("从粘贴板导入", systemImage: "doc.on.clipboard") {
+                            importFromClipboard()
+                        }
+                        Button("从文件导入", systemImage: "folder") {
+                            showingImporter = true
+                        }
                     } label: {
                         Image(systemName: "ellipsis.circle")
                     }
@@ -100,6 +108,24 @@ struct ScriptListView: View {
                     display: settings.display,
                     scroll: settings.scroll
                 )
+            }
+            .fileImporter(
+                isPresented: $showingImporter,
+                allowedContentTypes: ScriptImporter.readableTypes,
+                allowsMultipleSelection: false
+            ) { result in
+                importFromFile(result)
+            }
+            .alert(
+                "导入失败",
+                isPresented: Binding(
+                    get: { importError != nil },
+                    set: { if !$0 { importError = nil } }
+                )
+            ) {
+                Button("知道了") { importError = nil }
+            } message: {
+                Text(importError ?? "")
             }
             .confirmationDialog(
                 "删除这篇台本？",
@@ -148,6 +174,35 @@ struct ScriptListView: View {
         .buttonStyle(.plain)
     }
 
+    private func importFromClipboard() {
+        guard let imported = ScriptImporter.fromClipboard() else {
+            importError = "粘贴板里没有可用的文字。先复制一段稿子再试。"
+            return
+        }
+        let script = Script(title: imported.title, body: imported.body)
+        context.insert(script)
+        try? context.save()
+        editingScript = script
+    }
+
+    private func importFromFile(_ result: Result<[URL], Error>) {
+        switch result {
+        case .success(let urls):
+            guard let url = urls.first else { return }
+            do {
+                let imported = try ScriptImporter.read(from: url)
+                let script = Script(title: imported.title, body: imported.body)
+                context.insert(script)
+                try? context.save()
+                editingScript = script
+            } catch {
+                importError = error.localizedDescription
+            }
+        case .failure(let error):
+            importError = error.localizedDescription
+        }
+    }
+
     private func createScript() {
         let script = Script(title: "未命名台本", body: "")
         context.insert(script)
@@ -186,6 +241,9 @@ struct ScriptListView: View {
                     Button("从头提词", systemImage: "play.circle") {
                         script.lastReadTokenIndex = 0
                         activeScript = script
+                    }
+                    ShareLink(item: script.body) {
+                        Label("分享台本", systemImage: "square.and.arrow.up")
                     }
                     Divider()
                     Button("删除", systemImage: "trash", role: .destructive) {

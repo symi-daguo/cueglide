@@ -130,6 +130,31 @@ final class PrompterViewModel {
         tracker.resync(to: lastKnownToken)
     }
 
+    // MARK: - 进度跳转
+
+    @ObservationIgnored private var wasRunningBeforeScrub = false
+
+    /// 拖动进度条时先暂停，松手再恢复，避免自动滚动和手动定位互相打架。
+    func handleScrub(_ isEditing: Bool) {
+        if isEditing {
+            wasRunningBeforeScrub = engine.isRunning
+            if engine.isRunning {
+                engine.pause()
+            }
+        } else if wasRunningBeforeScrub {
+            wasRunningBeforeScrub = false
+            engine.start()
+        }
+    }
+
+    func seek(toProgress value: Double) {
+        let total = max(tokenized.totalTokens - 1, 0)
+        let target = min(max(value, 0), 1) * Double(total)
+        lastKnownToken = Int(target.rounded())
+        engine.seek(toTokenPosition: target)
+        tracker.resync(to: lastKnownToken)
+    }
+
     // MARK: - 遥控
 
     private func handleRemote(_ command: RemoteController.Command) {
