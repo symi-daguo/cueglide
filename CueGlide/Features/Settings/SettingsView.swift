@@ -186,9 +186,24 @@ struct SettingsView: View {
                     .labelsHidden()
                 }
                 .padding(.vertical, 6)
+
+                divider
+
+                HStack {
+                    rowLabel("识别语言")
+                    Spacer()
+                    Menu {
+                        Button("跟随系统") { settings.speechLocaleIdentifier = "" }
+                        Button("中文（普通话）") { settings.speechLocaleIdentifier = "zh-CN" }
+                        Button("English（美国）") { settings.speechLocaleIdentifier = "en-US" }
+                    } label: {
+                        menuValue(speechLocaleLabel)
+                    }
+                }
+                .padding(.vertical, 6)
             }
 
-            hint("语速基准同时用于台本列表里的录制时长估算。")
+            hint("语速基准同时用于台本列表里的录制时长估算。语音跟读全程在本机完成，音频不出设备。")
         }
     }
 
@@ -244,6 +259,15 @@ struct SettingsView: View {
     }
 
     // MARK: - 组件
+
+    private var speechLocaleLabel: String {
+        switch settings.speechLocaleIdentifier {
+        case "": "跟随系统"
+        case "zh-CN": "中文（普通话）"
+        case "en-US": "English"
+        default: settings.speechLocaleIdentifier
+        }
+    }
 
     private func groupTitle(_ text: String) -> some View {
         Text(text)
@@ -310,7 +334,7 @@ struct SettingsView: View {
 
 extension Bundle {
     var appVersion: String {
-        let short = infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.0.2"
+        let short = infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.1.0"
         let build = infoDictionary?["CFBundleVersion"] as? String ?? "1"
         return "\(short) (\(build))"
     }

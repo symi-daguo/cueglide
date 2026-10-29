@@ -3,11 +3,20 @@ import SwiftData
 
 struct HomeView: View {
 
+    /// 切到模板页。由 RootView 注入，避免首页自己管标签页状态。
+    let onOpenTemplates: () -> Void
+
     @Environment(AppSettings.self) private var settings
     @Query(sort: [SortDescriptor(\Script.updatedAt, order: .reverse)]) private var scripts: [Script]
-    @State private var activeScript: Script?
+    @State private var request: PrompterRequest?
 
     private var latest: Script? { scripts.first }
+
+    struct PrompterRequest: Identifiable {
+        let id = UUID()
+        let script: Script
+        let startVoice: Bool
+    }
 
     var body: some View {
         NavigationStack {
@@ -32,11 +41,12 @@ struct HomeView: View {
             }
             .background(Theme.canvas)
             .toolbar(.hidden, for: .navigationBar)
-            .fullScreenCover(item: $activeScript) { script in
+            .fullScreenCover(item: $request) { request in
                 PrompterView(
-                    script: script,
+                    script: request.script,
                     display: settings.display,
-                    scroll: settings.scroll
+                    scroll: settings.scroll,
+                    autoStartVoice: request.startVoice
                 )
             }
         }
@@ -96,7 +106,7 @@ struct HomeView: View {
                 Spacer()
 
                 Button {
-                    activeScript = script
+                    request = PrompterRequest(script: script, startVoice: false)
                 } label: {
                     HStack(spacing: 6) {
                         Image(systemName: "play.fill")
@@ -148,29 +158,34 @@ struct HomeView: View {
                 subtitle: "纯净阅读",
                 symbol: "text.alignleft",
                 tint: Theme.accentBlue,
-                symbolColor: Theme.brand,
-                badge: nil
+                symbolColor: Theme.brand
             ) {
-                activeScript = latest
+                if let latest {
+                    request = PrompterRequest(script: latest, startVoice: false)
+                }
             }
 
             quickCard(
-                title: "提词拍摄",
-                subtitle: "边读边录",
-                symbol: "camera.fill",
+                title: "语音跟读",
+                subtitle: "念到哪滚到哪",
+                symbol: "waveform",
                 tint: Theme.accentGreen,
-                symbolColor: Color(uiColor: UIColor(rgb: 0x2F9E64)),
-                badge: "待开放"
-            ) {}
+                symbolColor: Color(uiColor: UIColor(rgb: 0x2F9E64))
+            ) {
+                if let latest {
+                    request = PrompterRequest(script: latest, startVoice: true)
+                }
+            }
 
             quickCard(
-                title: "悬浮提词",
-                subtitle: "盖在其他 App 上",
-                symbol: "pip.fill",
+                title: "台本模板",
+                subtitle: "六个场景骨架",
+                symbol: "square.grid.2x2",
                 tint: Theme.brandSoft,
-                symbolColor: Theme.brand,
-                badge: "待开放"
-            ) {}
+                symbolColor: Theme.brand
+            ) {
+                onOpenTemplates()
+            }
         }
     }
 
@@ -180,7 +195,6 @@ struct HomeView: View {
         symbol: String,
         tint: Color,
         symbolColor: Color,
-        badge: String?,
         action: @escaping () -> Void
     ) -> some View {
         Button(action: action) {
@@ -190,11 +204,6 @@ struct HomeView: View {
                         .font(.system(size: 18, weight: .semibold))
                         .foregroundStyle(symbolColor)
                     Spacer()
-                    if let badge {
-                        Text(badge)
-                            .font(.system(size: 9, weight: .medium))
-                            .foregroundStyle(Theme.textTertiary)
-                    }
                 }
                 Spacer(minLength: 0)
                 Text(title)
@@ -210,8 +219,6 @@ struct HomeView: View {
             .background(tint, in: .rect(cornerRadius: 16))
         }
         .buttonStyle(.plain)
-        .disabled(badge != nil)
-        .opacity(badge == nil ? 1 : 0.55)
     }
 
     // MARK: - 最近
@@ -226,7 +233,7 @@ struct HomeView: View {
                 HStack(spacing: 10) {
                     ForEach(Array(scripts.dropFirst().prefix(8))) { script in
                         Button {
-                            activeScript = script
+                            request = PrompterRequest(script: script, startVoice: false)
                         } label: {
                             VStack(alignment: .leading, spacing: 6) {
                                 Text(script.title.isEmpty ? "未命名台本" : script.title)
@@ -273,7 +280,7 @@ struct HomeView: View {
 }
 
 #Preview {
-    HomeView()
+    HomeView(onOpenTemplates: {})
         .environment(AppSettings())
         .modelContainer(for: Script.self, inMemory: true)
 }

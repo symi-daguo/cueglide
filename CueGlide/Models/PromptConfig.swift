@@ -163,3 +163,71 @@ struct ScrollConfig: Codable, Equatable, Sendable {
         countdown = min(max(countdown, 0), 10)
     }
 }
+
+// MARK: - 速度的统一表示
+
+extension ScrollConfig {
+
+    /// 当前模式下滑块的可调范围。
+    var speedRange: ClosedRange<Double> {
+        switch mode {
+        case .constant: 8...200
+        case .wpm: 80...400
+        case .timed: 30...1200
+        case .voice: 0...1
+        }
+    }
+
+    /// 滑块步长。
+    var speedStep: Double {
+        switch mode {
+        case .constant: 4
+        case .wpm: 5
+        case .timed: 15
+        case .voice: 1
+        }
+    }
+
+    /// 滑块当前值。
+    var speedValue: Double {
+        switch mode {
+        case .constant: pointsPerSecond
+        case .wpm: wordsPerMinute
+        case .timed: targetDuration
+        case .voice: 0
+        }
+    }
+
+    /// 界面上显示的速度文案。
+    var speedLabel: String {
+        switch mode {
+        case .constant: "\(Int(pointsPerSecond))"
+        case .wpm: "\(Int(wordsPerMinute))"
+        case .timed: {
+            let total = Int(targetDuration)
+            return String(format: "%d:%02d", total / 60, total % 60)
+        }()
+        case .voice: "跟读"
+        }
+    }
+
+    /// 速度单位，用于滑块右侧提示。
+    var speedUnit: String {
+        switch mode {
+        case .constant: "pt/s"
+        case .wpm: "字/分"
+        case .timed: "总时长"
+        case .voice: ""
+        }
+    }
+
+    mutating func setSpeed(_ value: Double) {
+        switch mode {
+        case .constant: pointsPerSecond = value
+        case .wpm: wordsPerMinute = value
+        case .timed: targetDuration = value
+        case .voice: break
+        }
+        clamp()
+    }
+}

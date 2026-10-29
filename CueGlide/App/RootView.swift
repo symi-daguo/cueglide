@@ -13,7 +13,7 @@ struct RootView: View {
     var body: some View {
         TabView(selection: $tab) {
             Tab("开拍", systemImage: "record.circle", value: AppTab.home) {
-                HomeView()
+                HomeView(onOpenTemplates: { tab = .templates })
             }
             Tab("台本", systemImage: "doc.text", value: AppTab.scripts) {
                 ScriptListView()

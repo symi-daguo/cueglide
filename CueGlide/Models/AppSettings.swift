@@ -26,6 +26,11 @@ final class AppSettings {
         didSet { persist() }
     }
 
+    /// 语音跟读的识别语言。空字符串表示跟随系统语言。
+    var speechLocaleIdentifier: String {
+        didSet { persist() }
+    }
+
     var hasInsertedSampleScript: Bool {
         didSet { persist() }
     }
@@ -37,6 +42,7 @@ final class AppSettings {
         static let scroll = "cueglide.scroll"
         static let wpm = "cueglide.wpm"
         static let awake = "cueglide.keepAwake"
+        static let speechLocale = "cueglide.speechLocale"
         static let sample = "cueglide.sampleInserted"
     }
 
@@ -61,6 +67,7 @@ final class AppSettings {
         wordsPerMinuteBaseline = storedWPM > 0 ? storedWPM : 240
 
         keepScreenAwake = defaults.object(forKey: Key.awake) as? Bool ?? true
+        speechLocaleIdentifier = defaults.string(forKey: Key.speechLocale) ?? ""
         hasInsertedSampleScript = defaults.bool(forKey: Key.sample)
     }
 
@@ -73,6 +80,7 @@ final class AppSettings {
         }
         defaults.set(wordsPerMinuteBaseline, forKey: Key.wpm)
         defaults.set(keepScreenAwake, forKey: Key.awake)
+        defaults.set(speechLocaleIdentifier, forKey: Key.speechLocale)
         defaults.set(hasInsertedSampleScript, forKey: Key.sample)
     }
 }

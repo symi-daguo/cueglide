@@ -10,6 +10,7 @@ final class PrompterViewModel {
     private(set) var tokenized: TokenizedScript
     let renderer: PrompterRenderer
     let engine = ScrollEngine()
+    let tracker = SpeechTracker()
 
     var display: DisplayConfig
     var scroll: ScrollConfig
@@ -17,6 +18,16 @@ final class PrompterViewModel {
     var controlsVisible = true
     var showsSettings = false
     var isIdleTimerDisabled = false
+    /// 当前正在调节哪一项，控制条据此展开对应的滑块。
+    var adjustTarget: AdjustTarget = .none
+    /// 语音跟读失败时的提示，非 nil 时弹横幅。
+    var voiceAlert: String?
+
+    enum AdjustTarget: Equatable {
+        case none
+        case fontSize
+        case speed
+    }
 
     @ObservationIgnored private var viewportSize: CGSize = .zero
     @ObservationIgnored private var hideControlsTask: Task<Void, Never>?
@@ -36,6 +47,13 @@ final class PrompterViewModel {
         engine.onFrame = { [weak self] position in
             self?.handleFrame(position)
         }
+        tracker.prepare(tokenized: tokenized, localeIdentifier: "")
+        tracker.onAdvance = { [weak self] token in
+            MainActor.assumeIsolated {
+                self?.handleVoiceAdvance(token)
+            }
+        }
+
         renderer.hostView.onLayout = { [weak self] size in
             MainActor.assumeIsolated {
                 self?.updateViewport(size)
@@ -91,6 +109,7 @@ final class PrompterViewModel {
         let index = renderer.tokenIndex(atViewportY: y)
         lastKnownToken = index
         engine.seek(toTokenPosition: Double(index))
+        tracker.resync(to: index)
         showControls()
     }
 
@@ -98,6 +117,67 @@ final class PrompterViewModel {
         let target = Double(lastKnownToken) + tokens
         lastKnownToken = Int(target.rounded())
         engine.seek(toTokenPosition: target)
+        tracker.resync(to: lastKnownToken)
+    }
+
+    // MARK: - 语音跟读
+
+    func configureVoice(localeIdentifier: String) {
+        tracker.prepare(tokenized: tokenized, localeIdentifier: localeIdentifier)
+        tracker.resync(to: lastKnownToken)
+    }
+
+    var isVoiceActive: Bool { tracker.state.isActive }
+
+    func toggleVoice() {
+        if tracker.state.isActive {
+            Task {
+                await tracker.stop()
+                if scroll.mode == .voice {
+                    var next = scroll
+                    next.mode = .constant
+                    applyScroll(next)
+                }
+                showControls()
+            }
+            return
+        }
+
+        Task {
+            await tracker.start()
+            guard tracker.state == .listening else {
+                if case .unavailable(let message) = tracker.state {
+                    voiceAlert = message
+                }
+                return
+            }
+            tracker.resync(to: lastKnownToken)
+            var next = scroll
+            next.mode = .voice
+            applyScroll(next)
+            engine.seek(toTokenPosition: Double(lastKnownToken))
+            showControls()
+        }
+    }
+
+    var voiceHint: String {
+        switch tracker.state {
+        case .idle:
+            ""
+        case .preparing:
+            "正在准备语音模型，首次使用需要下载"
+        case .listening:
+            tracker.latestTranscript.isEmpty
+                ? "在听，直接开始读稿即可"
+                : "听到：" + String(tracker.latestTranscript.suffix(16))
+        case .unavailable(let message):
+            message
+        }
+    }
+
+    private func handleVoiceAdvance(_ token: Int) {
+        lastKnownToken = token
+        engine.seek(toTokenPosition: Double(token))
     }
 
     // MARK: - 参数
@@ -147,7 +227,7 @@ final class PrompterViewModel {
 
     func scheduleHideControls() {
         hideControlsTask?.cancel()
-        guard engine.isRunning else { return }
+        guard engine.isRunning, adjustTarget == .none else { return }
         hideControlsTask = Task { [weak self] in
             try? await Task.sleep(for: .seconds(3))
             guard !Task.isCancelled else { return }

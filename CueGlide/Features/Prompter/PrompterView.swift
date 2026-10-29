@@ -6,10 +6,13 @@ struct PrompterView: View {
 
     @State private var viewModel: PrompterViewModel
     @Environment(\.dismiss) private var dismiss
+    @Environment(AppSettings.self) private var appSettings
     @State private var dragStartToken: Int = 0
+    private let autoStartVoice: Bool
 
-    init(script: Script, display: DisplayConfig, scroll: ScrollConfig) {
+    init(script: Script, display: DisplayConfig, scroll: ScrollConfig, autoStartVoice: Bool = false) {
         _viewModel = State(initialValue: PrompterViewModel(script: script, display: display, scroll: scroll))
+        self.autoStartVoice = autoStartVoice
     }
 
     private var background: Color {
@@ -42,10 +45,19 @@ struct PrompterView: View {
                 countdownOverlay
             }
             .onAppear {
+                viewModel.configureVoice(localeIdentifier: appSettings.speechLocaleIdentifier)
                 viewModel.updateViewport(proxy.size)
                 UIApplication.shared.isIdleTimerDisabled = true
                 if ProcessInfo.processInfo.arguments.contains("-autoPlay") {
                     viewModel.togglePlayback()
+                }
+                if autoStartVoice || ProcessInfo.processInfo.arguments.contains("-autoVoice") {
+                    viewModel.toggleVoice()
+                }
+                if ProcessInfo.processInfo.arguments.contains("-adjustFont") {
+                    viewModel.adjustTarget = .fontSize
+                } else if ProcessInfo.processInfo.arguments.contains("-adjustSpeed") {
+                    viewModel.adjustTarget = .speed
                 }
             }
             .onDisappear {
@@ -59,6 +71,17 @@ struct PrompterView: View {
         .ignoresSafeArea()
         .statusBarHidden()
         .persistentSystemOverlays(.hidden)
+        .alert(
+            "语音跟读不可用",
+            isPresented: Binding(
+                get: { viewModel.voiceAlert != nil },
+                set: { if !$0 { viewModel.voiceAlert = nil } }
+            )
+        ) {
+            Button("知道了") { viewModel.voiceAlert = nil }
+        } message: {
+            Text(viewModel.voiceAlert ?? "")
+        }
     }
 
     // MARK: - 渐隐
@@ -177,14 +200,13 @@ struct PrompterView: View {
     }
 
     private var controlBar: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: 9) {
             HStack(spacing: 6) {
                 Text(viewModel.script.title.isEmpty ? "未命名台本" : viewModel.script.title)
                     .font(.system(size: 11, weight: .medium))
                     .lineLimit(1)
                     .layoutPriority(1)
-                Text("·")
-                    .opacity(0.4)
+                Text("·").opacity(0.4)
                 Text(viewModel.progressLabel)
                     .font(.system(size: 11).monospacedDigit())
                 Spacer(minLength: 4)
@@ -198,26 +220,53 @@ struct PrompterView: View {
                 .tint(Color(uiColor: viewModel.display.palette.highlight))
                 .progressViewStyle(.linear)
 
+            if viewModel.isVoiceActive {
+                voiceStatusRow
+            }
+
+            if viewModel.adjustTarget == .fontSize {
+                fontSizeSlider
+            }
+
+            if viewModel.adjustTarget == .speed {
+                speedSlider
+            }
+
             HStack(spacing: 8) {
-                controlButton("backward.end.fill") {
+                controlButton("backward.end.fill", caption: "回顶") {
                     viewModel.restart()
                 }
-                controlButton(viewModel.engine.isRunning ? "pause.fill" : "play.fill", prominent: true) {
+                controlButton(
+                    viewModel.engine.isRunning ? "pause.fill" : "play.fill",
+                    prominent: true
+                ) {
                     viewModel.togglePlayback()
                 }
-                controlButton("minus") {
-                    viewModel.adjustFontSize(-4)
+                .opacity(viewModel.scroll.mode == .voice ? 0.4 : 1)
+                .disabled(viewModel.scroll.mode == .voice)
+                controlButton("waveform", caption: "跟读", active: viewModel.isVoiceActive) {
+                    viewModel.toggleVoice()
                 }
-                controlButton("plus") {
-                    viewModel.adjustFontSize(4)
+                controlButton(
+                    "character",
+                    caption: "\(Int(viewModel.display.fontSize))",
+                    active: viewModel.adjustTarget == .fontSize
+                ) {
+                    toggleAdjust(.fontSize)
                 }
-                controlButton("slider.horizontal.3") {
-                    viewModel.showsSettings = true
+                controlButton(
+                    "speedometer",
+                    caption: viewModel.scroll.speedLabel,
+                    active: viewModel.adjustTarget == .speed
+                ) {
+                    toggleAdjust(.speed)
                 }
             }
         }
         .padding(12)
         .glassEffect(.regular, in: .rect(cornerRadius: 22))
+        .animation(.smooth(duration: 0.2), value: viewModel.adjustTarget)
+        .animation(.smooth(duration: 0.2), value: viewModel.isVoiceActive)
         .sheet(isPresented: $viewModel.showsSettings) {
             PrompterSettingsSheet(viewModel: viewModel)
                 .presentationDetents([.medium, .large])
@@ -225,25 +274,126 @@ struct PrompterView: View {
         }
     }
 
-    private func controlButton(_ symbol: String, prominent: Bool = false, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Image(systemName: symbol)
-                .font(.system(size: prominent ? 20 : 16, weight: .semibold))
-                .frame(maxWidth: .infinity)
-                .frame(height: 42)
-                .background {
-                    if prominent {
-                        RoundedRectangle(cornerRadius: 14, style: .continuous)
-                            .fill(Color(uiColor: viewModel.display.palette.highlight))
+    private var voiceStatusRow: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "waveform")
+                .font(.system(size: 10, weight: .semibold))
+                .symbolEffect(.variableColor.iterative, isActive: true)
+            Text(viewModel.voiceHint)
+                .font(.system(size: 10))
+                .lineLimit(1)
+            Spacer(minLength: 0)
+        }
+        .foregroundStyle(Color(uiColor: viewModel.display.palette.highlight))
+        .padding(.horizontal, 2)
+    }
+
+    private var fontSizeSlider: some View {
+        HStack(spacing: 10) {
+            Text("字号")
+                .font(.system(size: 10))
+                .frame(width: 24, alignment: .leading)
+            Slider(
+                value: Binding(
+                    get: { viewModel.display.fontSize },
+                    set: { newValue in
+                        var next = viewModel.display
+                        next.fontSize = newValue
+                        viewModel.applyDisplay(next)
                     }
+                ),
+                in: 20...96,
+                step: 2
+            )
+            .tint(Color(uiColor: viewModel.display.palette.highlight))
+            Text("\(Int(viewModel.display.fontSize))")
+                .font(.system(size: 11).monospacedDigit())
+                .frame(width: 26, alignment: .trailing)
+        }
+        .padding(.horizontal, 2)
+    }
+
+    private var speedSlider: some View {
+        HStack(spacing: 10) {
+            Text("速度")
+                .font(.system(size: 10))
+                .frame(width: 24, alignment: .leading)
+            Slider(
+                value: Binding(
+                    get: { viewModel.scroll.speedValue },
+                    set: { newValue in
+                        var next = viewModel.scroll
+                        next.setSpeed(newValue)
+                        viewModel.applyScroll(next)
+                    }
+                ),
+                in: viewModel.scroll.speedRange,
+                step: viewModel.scroll.speedStep
+            )
+            .tint(Color(uiColor: viewModel.display.palette.highlight))
+            .disabled(viewModel.scroll.mode == .voice)
+            Text(viewModel.scroll.speedUnit.isEmpty ? viewModel.scroll.speedLabel : viewModel.scroll.speedUnit)
+                .font(.system(size: 11))
+                .frame(width: 42, alignment: .trailing)
+                .opacity(0.7)
+        }
+        .padding(.horizontal, 2)
+    }
+
+    private func toggleAdjust(_ target: PrompterViewModel.AdjustTarget) {
+        withAnimation(.smooth(duration: 0.2)) {
+            viewModel.adjustTarget = viewModel.adjustTarget == target ? .none : target
+        }
+        viewModel.showControls()
+    }
+
+    private func controlButton(
+        _ symbol: String,
+        caption: String? = nil,
+        active: Bool = false,
+        prominent: Bool = false,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            VStack(spacing: 2) {
+                Image(systemName: symbol)
+                    .font(.system(size: prominent ? 19 : 15, weight: .semibold))
+                if let caption {
+                    Text(caption)
+                        .font(.system(size: 9, weight: .medium))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
                 }
-                .foregroundStyle(
-                    prominent
-                        ? Color(uiColor: viewModel.display.palette.background)
-                        : Color(uiColor: viewModel.display.palette.foreground)
-                )
+            }
+            .frame(maxWidth: .infinity)
+            .frame(height: 52)
+            .foregroundStyle(foreground(prominent: prominent, active: active))
+            .background {
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(background(prominent: prominent, active: active))
+            }
         }
         .buttonStyle(.plain)
+    }
+
+    private func foreground(prominent: Bool, active: Bool) -> Color {
+        if prominent {
+            return Color(uiColor: viewModel.display.palette.background)
+        }
+        if active {
+            return Color(uiColor: viewModel.display.palette.highlight)
+        }
+        return Color(uiColor: viewModel.display.palette.foreground)
+    }
+
+    private func background(prominent: Bool, active: Bool) -> Color {
+        if prominent {
+            return Color(uiColor: viewModel.display.palette.highlight)
+        }
+        if active {
+            return Color(uiColor: viewModel.display.palette.highlight).opacity(0.18)
+        }
+        return .clear
     }
 
     // MARK: - 倒计时
@@ -427,6 +577,16 @@ private struct PrompterSettingsSheet: View {
         Binding(
             get: { viewModel.scroll.mode },
             set: { new in
+                if new == .voice {
+                    if viewModel.isVoiceActive {
+                        var next = viewModel.scroll
+                        next.mode = .voice
+                        viewModel.applyScroll(next)
+                    } else {
+                        viewModel.toggleVoice()
+                    }
+                    return
+                }
                 var next = viewModel.scroll
                 next.mode = new
                 viewModel.applyScroll(next)

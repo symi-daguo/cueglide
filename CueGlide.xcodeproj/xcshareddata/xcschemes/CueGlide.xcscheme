@@ -21,6 +21,20 @@
                ReferencedContainer = "container:CueGlide.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
+         <BuildActionEntry
+            buildForTesting = "YES"
+            buildForRunning = "NO"
+            buildForProfiling = "NO"
+            buildForArchiving = "NO"
+            buildForAnalyzing = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "88E8BD88FE0E09EFDF9DAA30"
+               BuildableName = "CueGlideTests.xctest"
+               BlueprintName = "CueGlideTests"
+               ReferencedContainer = "container:CueGlide.xcodeproj">
+            </BuildableReference>
+         </BuildActionEntry>
       </BuildActionEntries>
    </BuildAction>
    <TestAction
@@ -39,6 +53,17 @@
          </BuildableReference>
       </MacroExpansion>
       <Testables>
+         <TestableReference
+            skipped = "NO"
+            parallelizable = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "88E8BD88FE0E09EFDF9DAA30"
+               BuildableName = "CueGlideTests.xctest"
+               BlueprintName = "CueGlideTests"
+               ReferencedContainer = "container:CueGlide.xcodeproj">
+            </BuildableReference>
+         </TestableReference>
       </Testables>
       <CommandLineArguments>
       </CommandLineArguments>
