@@ -33,6 +33,8 @@ final class CaptureViewModel {
             scroll: scroll,
             captureMode: true
         )
+        // 录制独占麦克风，跟读必须关掉
+        self.prompter.allowsVoiceTracking = false
     }
 
     var isRecording: Bool { phase == .recording }

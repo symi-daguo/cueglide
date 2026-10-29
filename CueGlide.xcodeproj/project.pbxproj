@@ -18,6 +18,7 @@
 		4046E2CA8CB23EBE0267B751 /* FloatingPrompterView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 895F0435C1E92C1CEC2A4292 /* FloatingPrompterView.swift */; };
 		467B6C589996B1039D014033 /* PrompterRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88D3DCE8ACB580DF243B11D5 /* PrompterRenderer.swift */; };
 		4FAD2285B26AD1A785F8DE56 /* FloatingPrompterController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2033F9DBFC4169400B3C2EF4 /* FloatingPrompterController.swift */; };
+		50F9FA975B16204BF4BF7244 /* ScrollEngineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50F9E74D662847DB6F95A07A /* ScrollEngineTests.swift */; };
 		5CD6137658625D632AC2FDEC /* ScriptEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A472A5BFE65A1E8BE596C33 /* ScriptEditorView.swift */; };
 		5F09E76B887D10585E6BEA68 /* Format.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBB054F0A2C6DFB4060ED3AD /* Format.swift */; };
 		6878C6E7A2FF001831F9726A /* ScriptAligner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 68D85B27204428A9E22C05C7 /* ScriptAligner.swift */; };
@@ -73,6 +74,7 @@
 		448B56BEC52A887104635AE7 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		46FE0EB6A998A83A57D0FA9F /* ScriptImporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScriptImporter.swift; sourceTree = "<group>"; };
 		50EC4C55AF543131DEFA5EC3 /* PrompterViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrompterViewModel.swift; sourceTree = "<group>"; };
+		50F9E74D662847DB6F95A07A /* ScrollEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScrollEngineTests.swift; sourceTree = "<group>"; };
 		52D73D4563133D6A8C364707 /* ScriptAlignerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScriptAlignerTests.swift; sourceTree = "<group>"; };
 		52E149ABE9791095B162570A /* RemoteController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteController.swift; sourceTree = "<group>"; };
 		63D99B344B868EFF78CA8297 /* CueGlideUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = CueGlideUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -221,6 +223,7 @@
 			children = (
 				52D73D4563133D6A8C364707 /* ScriptAlignerTests.swift */,
 				6D92415132CB7D9DF1828239 /* ScriptImporterTests.swift */,
+				50F9E74D662847DB6F95A07A /* ScrollEngineTests.swift */,
 			);
 			path = CueGlideTests;
 			sourceTree = "<group>";
@@ -430,6 +433,7 @@
 			files = (
 				92EC484FD4F2E39C05FF957C /* ScriptAlignerTests.swift in Sources */,
 				973486D189307B454B5D11B2 /* ScriptImporterTests.swift in Sources */,
+				50F9FA975B16204BF4BF7244 /* ScrollEngineTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -562,7 +566,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 0.6.0;
+				MARKETING_VERSION = 0.6.1;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -631,7 +635,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 0.6.0;
+				MARKETING_VERSION = 0.6.1;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;

@@ -46,6 +46,7 @@ struct PrompterView: View {
             }
             .onAppear {
                 viewModel.onRequestExit = { dismiss() }
+                viewModel.startRemote()
                 viewModel.configureVoice(localeIdentifier: appSettings.speechLocaleIdentifier)
                 viewModel.updateViewport(proxy.size)
                 UIApplication.shared.isIdleTimerDisabled = true

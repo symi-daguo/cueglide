@@ -25,6 +25,9 @@ final class PrompterViewModel {
     var voiceAlert: String?
     /// 遥控按 Esc 时要求退出，由界面层关闭页面。
     @ObservationIgnored var onRequestExit: (() -> Void)?
+    /// 是否允许开启语音跟读。录制页要关掉：录制本身占着麦克风，
+    /// 跟读再开一个音频会话会把录音掐断，两条链路只能留一条。
+    @ObservationIgnored var allowsVoiceTracking = true
 
     enum AdjustTarget: Equatable {
         case none
@@ -62,7 +65,6 @@ final class PrompterViewModel {
                 self?.handleRemote(command)
             }
         }
-        remote.start()
 
         renderer.hostView.onLayout = { [weak self] size in
             MainActor.assumeIsolated {
@@ -195,6 +197,12 @@ final class PrompterViewModel {
         showControls()
     }
 
+    /// 由界面在出现时调用。放在这里而不是 init，是因为 @State 的初始化值
+    /// 可能被 SwiftUI 多次求值，每求值一次就会多注册一组通知监听。
+    func startRemote() {
+        remote.start()
+    }
+
     func stopRemote() {
         remote.stop()
     }
@@ -209,6 +217,10 @@ final class PrompterViewModel {
     var isVoiceActive: Bool { tracker.state.isActive }
 
     func toggleVoice() {
+        guard allowsVoiceTracking else {
+            voiceAlert = "录制中无法使用语音跟读。录制和跟读都要占用麦克风，只能二选一。"
+            return
+        }
         if tracker.state.isActive {
             Task {
                 await tracker.stop()

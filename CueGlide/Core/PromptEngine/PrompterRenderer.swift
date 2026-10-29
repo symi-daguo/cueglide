@@ -191,9 +191,13 @@ final class PrompterRenderer {
 
     var isMeasured: Bool { !lines.isEmpty }
 
-    /// 阅读列的最大宽度。iPhone Duo 展开、iPad 横屏时若不限宽，一行会排到十几个词，
-    /// 视线扫视距离过长，朗读节奏会被拖慢。
-    private let maxReadingColumn: CGFloat = 560
+    /// 阅读列的最大宽度。
+    ///
+    /// 竖屏用 560，一行约 16 个中文字。横屏不能沿用这个值：横屏时前置摄像头在屏幕侧边，
+    /// 一行排太宽，眼睛会在左右两端来回扫，视线离开镜头，观众能看出来在念稿。
+    /// 横屏收到 420，一行约 12 字，眼球位移控制在镜头附近。
+    private let portraitReadingColumn: CGFloat = 560
+    private let landscapeReadingColumn: CGFloat = 420
 
     /// 阅读线以上留出整段空白，保证第 0 个词也落在阅读线上而不是顶到状态栏。
     ///
@@ -215,7 +219,8 @@ final class PrompterRenderer {
         // 底部至少留一行，避免最后一段永远滚不上来
         let bottom = max(height - anchor - 40, 40)
 
-        let extraSide = max((availableWidth - maxReadingColumn) / 2, 0)
+        let maxColumn = isLandscape ? landscapeReadingColumn : portraitReadingColumn
+        let extraSide = max((availableWidth - maxColumn) / 2, 0)
         let side = config.horizontalInset + extraSide
 
         return UIEdgeInsets(top: anchor, left: side, bottom: bottom, right: side)
