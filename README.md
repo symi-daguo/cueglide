@@ -2,6 +2,8 @@
 
 一款只做提词的 iOS 原生应用。免费、开源、离线、无账号。
 
+<img src="docs/images/05-功能总览.png" width="760" alt="CueGlide 功能总览">
+
 用 Swift 6 与 SwiftUI 编写，基于 iOS 26 及以上，支持 iPhone、iPad 与 iPhone Duo 折叠屏。
 
 <p>
@@ -91,18 +93,25 @@ xcodebuild -project CueGlide.xcodeproj \
 CueGlide/
   App/              入口与标签页导航
   DesignSystem/     颜色、字体、格式化等视觉 token
-  Models/           台本、显示配置、滚动配置、模板
+  Models/           台本、显示配置、滚动配置、模板、导入
   Core/
     PromptEngine/   分词索引、滚动引擎、文本渲染
-    Speech/         语音跟踪（规划中）
+    Speech/         端侧语音转写与字符级对稿
+    Capture/        相机采集与录制写入
+    PiP/            悬浮提词的离屏渲染与画中画
+    Remote/         外接键盘遥控
   Features/
     Home/           开拍首页
     Scripts/        台本列表与编辑
-    Prompter/       提词页
+    Prompter/       提词页与悬浮提词
+    Capture/        提词拍摄
     Templates/      模板库
     Settings/       设置
+CueGlideTests/        单元测试（22 个用例）
+CueGlideUITests/      横竖屏截图测试
 docs/
   设计说明.md        产品边界、界面规格、核心算法、技术选型
+  images/            技术示意图（SVG 矢量源 + PNG 成品）
   screenshots/      界面截图
 ```
 

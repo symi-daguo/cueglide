@@ -2,13 +2,36 @@
 
 本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)，格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)。
 
+## [0.6.2] - 2026-10-30
+
+文档配图与一致性修正，无功能变更。
+
+### 新增
+
+- README 顶部新增功能总览图；四张技术示意图（提词核心链路、语音跟读对齐链路、悬浮提词帧链路、横屏阅读列宽）插入 `docs/设计说明.md` 对应章节
+- 配图同时提供 SVG 矢量源与 2x PNG 成品，放在 `docs/images/`，中文用系统字体渲染，逐张做过文字与版式校验
+
+### 修正
+
+- README「项目结构」补全 `Core/Capture`、`Core/PiP`、`Core/Remote`、`Features/Capture` 与两个测试 target，去掉语音跟读的「规划中」标记
+- `docs/设计说明.md` 版本号从 0.0.1 更新到 0.6.2，功能范围表去掉已实现功能的「规划中」标记，技术选型里语音改为「已实现，录制时禁用」
+- 修正设计说明 5.8 节关于音频分流的不实描述：原写「一次采集同时喂给 AVAssetWriter 和 SpeechAnalyzer」，实际 `CameraController.onAudioSample` 未接线，改为明确「拍摄时禁止跟读，二选一」，与 0.6.1 的审查结论一致
+- 5.5 节补充横屏列宽 420pt、阅读线 ≥22% 且 ≥76pt 的规则
+- 章节编号修正：台本导入与进度跳转从「5.8.1 / 5.8.2」提升为独立章节 5.9 / 5.10，原外接遥控顺延为 5.11
+- 里程碑 M4 补上已完成的无障碍，M6 去掉已完成的无障碍
+- 修正 CHANGELOG 0.6.1 中 `SpeechAppEngine` 笔误为 `SpeechTracker` / `AVAudioEngine`
+
+### 发布
+
+- 补建 v0.6.1 的 GitHub Release（此前 commit、push、tag 均已成功，仅 release 缺失）
+
 ## [0.6.1] - 2026-10-29
 
 全仓审查后的修正，无新功能。
 
 ### 修复
 
-- **录制时语音跟读会抢麦克风**：`CameraController.onAudioSample` 定义了音频分流接口，但没有任何地方接线，等于分流没生效。用户若在录制页开跟读，`SpeechAppEngine` 会另开一套音频会话，把录音掐断或让识别中断。现在录制页直接禁止开跟读并给出说明
+- **录制时语音跟读会抢麦克风**：`CameraController.onAudioSample` 定义了音频分流接口，但没有任何地方接线，等于分流没生效。用户若在录制页开跟读，`SpeechTracker` 会另开一套 `AVAudioEngine` 音频会话，把录音掐断或让识别中断。现在录制页直接禁止开跟读并给出说明
 - **遥控监听可能重复注册**：`RemoteController.start()` 原本放在 `PrompterViewModel.init` 里。`@State` 的初始化值可能被 SwiftUI 多次求值，每求值一次就多注册一组通知监听。移到 `onAppear`，与 `onDisappear` 的 `stop` 配对
 
 ### 变更
