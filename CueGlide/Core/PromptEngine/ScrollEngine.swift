@@ -25,6 +25,13 @@ final class ScrollEngine {
     @ObservationIgnored private var frameCounter = 0
     @ObservationIgnored private var countdownDeadline: CFTimeInterval?
 
+    // 帧率采样，仅当启动参数带 -fpsProbe 时激活，用于性能验证
+    @ObservationIgnored private let fpsProbeEnabled = ProcessInfo.processInfo.arguments.contains("-fpsProbe")
+    @ObservationIgnored private var probeFrames = 0
+    @ObservationIgnored private var probeDropped = 0
+    @ObservationIgnored private var probeLastReport = CFAbsoluteTimeGetCurrent()
+    @ObservationIgnored private var probeMaxGap: Double = 0
+
     /// 每帧回调，参数是当前浮点词索引。渲染层在这里直接改 contentOffset，不经过 SwiftUI。
     @ObservationIgnored var onFrame: ((Double) -> Void)?
 
@@ -161,9 +168,29 @@ final class ScrollEngine {
             return
         }
 
-        let delta = min(now - lastTimestamp, 0.125)
+        let rawDelta = now - lastTimestamp
+        let delta = min(rawDelta, 0.125)
         lastTimestamp = now
         elapsed += delta
+
+        if fpsProbeEnabled {
+            probeFrames += 1
+            probeMaxGap = max(probeMaxGap, rawDelta)
+            // 120Hz 下正常帧间隔 8.3ms，超过 26ms 记一次掉帧
+            if rawDelta > 0.026 {
+                probeDropped += 1
+            }
+            let clock = CFAbsoluteTimeGetCurrent()
+            if clock - probeLastReport >= 2 {
+                let ratio = Double(probeDropped) / Double(max(probeFrames, 1)) * 100
+                NSLog("[FPS] 帧数=%d 掉帧=%d 掉帧率=%.1f%% 最大间隔=%.0fms",
+                      probeFrames, probeDropped, ratio, probeMaxGap * 1000)
+                probeFrames = 0
+                probeDropped = 0
+                probeMaxGap = 0
+                probeLastReport = clock
+            }
+        }
 
         var next = livePosition
 

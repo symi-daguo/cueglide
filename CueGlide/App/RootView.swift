@@ -47,9 +47,26 @@ struct RootView: View {
         return .home
     }
 
-    /// 支持 `-openPrompter` 启动参数直接进提词页，方便自动化验证与后续快捷指令复用。
+    /// 调试与自动化验证入口。全部通过启动参数触发，正常使用时不会命中：
+    /// - `-openPrompter` 直接进提词页
+    /// - `-autoPlay` 进提词页后自动播放
+    /// - `-autoVoice` 进提词页后自动开启语音跟读
+    /// - `-tabScripts` / `-tabTemplates` / `-tabSettings` 指定首屏
+    /// - `-openFloating` / `-openCapture` 打开悬浮提词 / 提词拍摄
+    /// - `-stressPrompt` 注入万字长稿并进提词页，用于性能压测
+    /// - `-fpsProbe` 打开帧率采样，结果输出到系统日志
     private func handleLaunchArguments() {
         let args = ProcessInfo.processInfo.arguments
+
+        // 性能压测入口：注入一篇万字长稿并直接进提词页
+        if args.contains("-stressPrompt") {
+            let stress = Script(title: "性能压测稿", body: SampleText.long)
+            context.insert(stress)
+            try? context.save()
+            deepLinkScript = stress
+            return
+        }
+
         guard args.contains("-openPrompter") else { return }
         let target = scripts.first ?? {
             let fallback = Script(title: "验证稿", body: SampleText.long)
