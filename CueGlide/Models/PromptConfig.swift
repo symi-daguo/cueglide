@@ -44,9 +44,9 @@ enum ReadingLinePosition: String, Codable, CaseIterable, Sendable, Identifiable 
     /// 阅读线距离屏幕顶部的比例，用来算 contentOffset 的锚点。
     var viewportRatio: Double {
         switch self {
-        case .nearCamera: 0.20
-        case .center: 0.42
-        case .lower: 0.62
+        case .nearCamera: 0.14
+        case .center: 0.38
+        case .lower: 0.58
         }
     }
 }

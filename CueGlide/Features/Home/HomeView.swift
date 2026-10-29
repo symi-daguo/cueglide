@@ -68,7 +68,7 @@ struct HomeView: View {
     // MARK: - 主卡
 
     private func heroCard(_ script: Script) -> some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 16) {
             HStack(spacing: 6) {
                 Image(systemName: "clock.arrow.circlepath")
                     .font(.system(size: 11, weight: .semibold))
@@ -112,7 +112,7 @@ struct HomeView: View {
                 .buttonStyle(.plain)
             }
         }
-        .padding(18)
+        .padding(20)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Theme.surface, in: .rect(cornerRadius: Theme.cardRadius))
         .overlay {
@@ -130,7 +130,7 @@ struct HomeView: View {
                 .font(Theme.captionFont)
                 .foregroundStyle(Theme.textSecondary)
         }
-        .padding(18)
+        .padding(20)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Theme.surface, in: .rect(cornerRadius: Theme.cardRadius))
         .overlay {
@@ -205,8 +205,8 @@ struct HomeView: View {
                     .foregroundStyle(Theme.textSecondary)
                     .lineLimit(1)
             }
-            .padding(14)
-            .frame(maxWidth: .infinity, minHeight: 108, alignment: .leading)
+            .padding(16)
+            .frame(maxWidth: .infinity, minHeight: 122, alignment: .leading)
             .background(tint, in: .rect(cornerRadius: 16))
         }
         .buttonStyle(.plain)

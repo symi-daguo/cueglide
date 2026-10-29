@@ -36,6 +36,11 @@ final class PrompterViewModel {
         engine.onFrame = { [weak self] position in
             self?.handleFrame(position)
         }
+        renderer.hostView.onLayout = { [weak self] size in
+            MainActor.assumeIsolated {
+                self?.updateViewport(size)
+            }
+        }
     }
 
     // MARK: - 布局

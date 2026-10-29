@@ -4,6 +4,36 @@ import UIKit
 /// 1. 把稿件排版成一份 NSAttributedString，并缓存「词 → 行 → y 坐标」；
 /// 2. 按浮点词索引设置 contentOffset；
 /// 3. 增量更新已读变淡与当前词高亮，每次只改 1–3 个词的属性。
+/// 承载 UITextView 的容器。SwiftUI 只管理这个容器，容器自己把 textView 撑满，
+/// 避免 UIViewRepresentable 的自动布局与手动设 frame 打架导致高度为 1。
+final class PrompterHostView: UIView {
+
+    let textView = UITextView(usingTextLayoutManager: false)
+    var onLayout: ((CGSize) -> Void)?
+    private var lastSize: CGSize = .zero
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        addSubview(textView)
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        if textView.frame != bounds {
+            textView.frame = bounds
+        }
+        guard bounds.width > 1, bounds.height > 1 else { return }
+        if abs(bounds.width - lastSize.width) > 0.5 || abs(bounds.height - lastSize.height) > 0.5 {
+            lastSize = bounds.size
+            onLayout?(bounds.size)
+        }
+    }
+}
+
 @MainActor
 final class PrompterRenderer {
 
@@ -18,7 +48,8 @@ final class PrompterRenderer {
         let minY: CGFloat
     }
 
-    let textView: UITextView
+    let hostView: PrompterHostView
+    var textView: UITextView { hostView.textView }
 
     private(set) var tokenized: TokenizedScript
     private(set) var config: DisplayConfig
@@ -34,7 +65,8 @@ final class PrompterRenderer {
         self.config = config
 
         // 提词需要全篇精确坐标，用 TextKit 1 的 NSLayoutManager 一次性测量更直接。
-        let view = UITextView(usingTextLayoutManager: false)
+        let host = PrompterHostView()
+        let view = host.textView
         view.isEditable = false
         view.isSelectable = false
         view.isScrollEnabled = true
@@ -46,7 +78,7 @@ final class PrompterRenderer {
         view.textContainerInset = .zero
         view.contentInset = .zero
         view.layoutManager.allowsNonContiguousLayout = false
-        self.textView = view
+        self.hostView = host
 
         rebuildText()
     }
@@ -68,7 +100,8 @@ final class PrompterRenderer {
         }
         config = newConfig
 
-        if needsRebuild || abs(width - lastLayoutWidth) > 0.5 {
+        // 上一次测量如果在视图还没布局时失败，参数虽未变也必须重建，否则永远测不出来。
+        if needsRebuild || !isMeasured || abs(width - lastLayoutWidth) > 0.5 {
             rebuildText(width: width)
         } else {
             textView.backgroundColor = config.palette.background
@@ -79,14 +112,6 @@ final class PrompterRenderer {
 
     private func rebuildText(width: CGFloat = 0) {
         lastLayoutWidth = width
-        if width > 1 {
-            textView.frame = CGRect(
-                x: textView.frame.minX,
-                y: textView.frame.minY,
-                width: width,
-                height: max(textView.frame.height, 1)
-            )
-        }
         textView.backgroundColor = config.palette.background
         textView.textContainerInset = insets(for: viewportHeight, width: width)
 
@@ -113,7 +138,7 @@ final class PrompterRenderer {
         let layoutManager = textView.layoutManager
         let textContainer = textView.textContainer
         let storage = textView.textStorage
-        guard storage.length > 0, textView.bounds.width > 1 else {
+        guard storage.length > 0, textView.bounds.width > 1, textView.bounds.height > 1 else {
             lines = []
             metrics = Metrics()
             return
@@ -175,10 +200,15 @@ final class PrompterRenderer {
 
     /// 视口尺寸确定或变化后调用，重设内容内边距并重新测量。
     func setViewportHeight(_ height: CGFloat) {
-        guard height > 1, abs(height - viewportHeight) > 1 else { return }
-        viewportHeight = height
-        textView.textContainerInset = insets(for: height)
-        measure()
+        guard height > 1 else { return }
+        let changed = abs(height - viewportHeight) > 1
+        if changed {
+            viewportHeight = height
+            textView.textContainerInset = insets(for: height)
+        }
+        if changed || !isMeasured {
+            measure()
+        }
     }
 
     /// 宽度变化时（折叠展开、旋转、外接屏）重算列宽与内边距。

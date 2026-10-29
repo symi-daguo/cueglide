@@ -257,7 +257,7 @@ struct SettingsView: View {
             content()
         }
         .padding(.horizontal, 16)
-        .padding(.vertical, 10)
+        .padding(.vertical, 12)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Theme.surface, in: .rect(cornerRadius: 16))
         .overlay {
@@ -310,7 +310,7 @@ struct SettingsView: View {
 
 extension Bundle {
     var appVersion: String {
-        let short = infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.0.1"
+        let short = infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.0.2"
         let build = infoDictionary?["CFBundleVersion"] as? String ?? "1"
         return "\(short) (\(build))"
     }

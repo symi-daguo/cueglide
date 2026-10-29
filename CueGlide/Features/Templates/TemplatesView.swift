@@ -75,7 +75,7 @@ struct TemplatesView: View {
                 ZStack(alignment: .bottomLeading) {
                     RoundedRectangle(cornerRadius: 14, style: .continuous)
                         .fill(Color(uiColor: UIColor(rgb: template.accentHex)).opacity(0.14))
-                        .frame(height: 96)
+                        .frame(height: 108)
 
                     Text(template.scene)
                         .font(.system(size: 10, weight: .medium))
@@ -103,7 +103,7 @@ struct TemplatesView: View {
                     .padding(.top, 3)
                     .padding(.bottom, 2)
             }
-            .padding(10)
+            .padding(12)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(Theme.surface, in: .rect(cornerRadius: 18))
             .overlay {

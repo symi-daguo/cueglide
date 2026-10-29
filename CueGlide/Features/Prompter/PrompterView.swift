@@ -22,6 +22,7 @@ struct PrompterView: View {
                 background.ignoresSafeArea()
 
                 PrompterTextHost(renderer: viewModel.renderer)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .scaleEffect(
                         x: viewModel.display.mirror.flipsHorizontally ? -1 : 1,
                         y: viewModel.display.mirror.flipsVertically ? -1 : 1
@@ -68,13 +69,13 @@ struct PrompterView: View {
                 LinearGradient(
                     stops: [
                         .init(color: background, location: 0),
-                        .init(color: background, location: 0.55),
+                        .init(color: background, location: 0.68),
                         .init(color: background.opacity(0), location: 1)
                     ],
                     startPoint: .top,
                     endPoint: .bottom
                 )
-                .frame(height: 140)
+                .frame(height: 122)
             }
             .overlay(alignment: .bottom) {
                 LinearGradient(
@@ -141,7 +142,7 @@ struct PrompterView: View {
                 } label: {
                     Image(systemName: "xmark")
                         .font(.system(size: 15, weight: .semibold))
-                        .frame(width: 40, height: 40)
+                        .frame(width: 38, height: 38)
                 }
                 .buttonStyle(.plain)
                 .glassEffect(.regular, in: .circle)
@@ -155,13 +156,13 @@ struct PrompterView: View {
                 } label: {
                     Image(systemName: "arrow.left.arrow.right")
                         .font(.system(size: 14, weight: .semibold))
-                        .frame(width: 40, height: 40)
+                        .frame(width: 38, height: 38)
                 }
                 .buttonStyle(.plain)
                 .glassEffect(.regular, in: .circle)
             }
             .padding(.horizontal, 16)
-            .padding(.top, 54)
+            .padding(.top, 46)
 
             Spacer()
 
@@ -270,11 +271,16 @@ struct PrompterView: View {
 private struct PrompterTextHost: UIViewRepresentable {
     let renderer: PrompterRenderer
 
-    func makeUIView(context: Context) -> UITextView {
-        renderer.textView
+    func makeUIView(context: Context) -> PrompterHostView {
+        renderer.hostView
     }
 
-    func updateUIView(_ uiView: UITextView, context: Context) {}
+    func updateUIView(_ uiView: PrompterHostView, context: Context) {}
+
+    /// UIViewRepresentable 没有固有尺寸，不显式声明的话 SwiftUI 可能给 0 高度。
+    func sizeThatFits(_ proposal: ProposedViewSize, uiView: PrompterHostView, context: Context) -> CGSize? {
+        CGSize(width: proposal.width ?? 0, height: proposal.height ?? 0)
+    }
 }
 
 // MARK: - 参数面板

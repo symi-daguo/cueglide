@@ -157,7 +157,7 @@ struct ScriptListView: View {
     // MARK: - 卡片
 
     private func scriptCard(_ script: Script) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 13) {
             HStack(alignment: .top, spacing: 10) {
                 Image(systemName: "doc.text.fill")
                     .font(.system(size: 13))
@@ -165,7 +165,7 @@ struct ScriptListView: View {
                     .padding(8)
                     .background(Theme.brandSoft, in: .rect(cornerRadius: 9))
 
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: 6) {
                     Text(script.title.isEmpty ? "未命名台本" : script.title)
                         .font(.system(size: 16, weight: .semibold))
                         .foregroundStyle(Theme.textPrimary)
@@ -223,7 +223,7 @@ struct ScriptListView: View {
             .font(.system(size: 11))
             .foregroundStyle(Theme.textTertiary)
         }
-        .padding(14)
+        .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Theme.surface, in: .rect(cornerRadius: Theme.cardRadius))
         .overlay {
