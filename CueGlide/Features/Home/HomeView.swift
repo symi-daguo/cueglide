@@ -9,6 +9,7 @@ struct HomeView: View {
     @Environment(AppSettings.self) private var settings
     @Query(sort: [SortDescriptor(\Script.updatedAt, order: .reverse)]) private var scripts: [Script]
     @State private var request: PrompterRequest?
+    @State private var showsFloating = false
 
     private var latest: Script? { scripts.first }
 
@@ -29,6 +30,7 @@ struct HomeView: View {
                         emptyHero
                     }
                     quickActions
+                    templateEntry
                     if scripts.count > 1 {
                         recentSection
                     }
@@ -41,6 +43,15 @@ struct HomeView: View {
             }
             .background(Theme.canvas)
             .toolbar(.hidden, for: .navigationBar)
+            .task {
+                if ProcessInfo.processInfo.arguments.contains("-openFloating") {
+                    try? await Task.sleep(for: .milliseconds(400))
+                    showsFloating = true
+                }
+            }
+            .sheet(isPresented: $showsFloating) {
+                FloatingPrompterView()
+            }
             .fullScreenCover(item: $request) { request in
                 PrompterView(
                     script: request.script,
@@ -178,13 +189,13 @@ struct HomeView: View {
             }
 
             quickCard(
-                title: "台本模板",
-                subtitle: "六个场景骨架",
-                symbol: "square.grid.2x2",
+                title: "悬浮提词",
+                subtitle: "浮在相机之上",
+                symbol: "pip.fill",
                 tint: Theme.brandSoft,
                 symbolColor: Theme.brand
             ) {
-                onOpenTemplates()
+                showsFloating = true
             }
         }
     }
@@ -259,6 +270,27 @@ struct HomeView: View {
                 }
             }
         }
+    }
+
+    private var templateEntry: some View {
+        Button {
+            onOpenTemplates()
+        } label: {
+            HStack(spacing: 8) {
+                Image(systemName: "square.grid.2x2")
+                    .font(.system(size: 13, weight: .semibold))
+                Text("不会写？从场景模板开始")
+                    .font(.system(size: 13, weight: .medium))
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 11, weight: .semibold))
+            }
+            .foregroundStyle(Theme.brand)
+            .padding(14)
+            .frame(maxWidth: .infinity)
+            .background(Theme.brandSoft.opacity(0.6), in: .rect(cornerRadius: 14))
+        }
+        .buttonStyle(.plain)
     }
 
     private var footer: some View {

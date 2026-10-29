@@ -12,13 +12,17 @@
 		1EBC81C1A2BDF8A328BCEF4E /* Script.swift in Sources */ = {isa = PBXBuildFile; fileRef = 276D08B2A164067D268F7FD0 /* Script.swift */; };
 		36B29A3DBF9C5906D7D59FDB /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 89FD9E4805EB1DD8314633AC /* SettingsView.swift */; };
 		3EF14F0C9266BF24CBE8B7CB /* PromptConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1E2BEE79DFA51F4C05A05B0 /* PromptConfig.swift */; };
+		4046E2CA8CB23EBE0267B751 /* FloatingPrompterView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 895F0435C1E92C1CEC2A4292 /* FloatingPrompterView.swift */; };
 		467B6C589996B1039D014033 /* PrompterRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88D3DCE8ACB580DF243B11D5 /* PrompterRenderer.swift */; };
+		4FAD2285B26AD1A785F8DE56 /* FloatingPrompterController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2033F9DBFC4169400B3C2EF4 /* FloatingPrompterController.swift */; };
 		5CD6137658625D632AC2FDEC /* ScriptEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A472A5BFE65A1E8BE596C33 /* ScriptEditorView.swift */; };
 		5F09E76B887D10585E6BEA68 /* Format.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBB054F0A2C6DFB4060ED3AD /* Format.swift */; };
 		6878C6E7A2FF001831F9726A /* ScriptAligner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 68D85B27204428A9E22C05C7 /* ScriptAligner.swift */; };
+		69FFA7DBECC58C4006C42520 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 448B56BEC52A887104635AE7 /* Assets.xcassets */; };
 		6B98A81A7C65882EC9C1B3D0 /* TemplatesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 809E8C97087CEEAAFC956965 /* TemplatesView.swift */; };
 		6C622880677CA0F1D8F7572A /* AppSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0529E40ECB44E620D605ED33 /* AppSettings.swift */; };
 		73E77E152647E416E3A3C2C4 /* PrompterViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50EC4C55AF543131DEFA5EC3 /* PrompterViewModel.swift */; };
+		7804DC4905893DC9DCF3F777 /* FloatingFrameRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88CB044AD3908283267B655C /* FloatingFrameRenderer.swift */; };
 		838BC729DF5FCE2DEAB1D42C /* ScriptListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3CF893D46050A8FCF154D637 /* ScriptListView.swift */; };
 		84A87A2BFDA8A4CD88F62A45 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30F7E6C6F3D48C5097BA9E01 /* Theme.swift */; };
 		913EC282D5F092B7EBC1804E /* CueGlideApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 85A9A173815E50148C712545 /* CueGlideApp.swift */; };
@@ -28,6 +32,7 @@
 		C47C06184424989A62998DD5 /* ScriptTokenizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8800E2F8CEB795EF76639BDC /* ScriptTokenizer.swift */; };
 		E75CF0037856F7CDFC79D898 /* SampleText.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC0F7CB91E50D109350E0D69 /* SampleText.swift */; };
 		E8360E5461E707F9BE301B87 /* PrompterView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7326E8DBDE9DC17176A2DE51 /* PrompterView.swift */; };
+		EB074F299DA570B992B5A844 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = E48E6D08A29CA59FFB33BD14 /* PrivacyInfo.xcprivacy */; };
 		FC735D38FA0247D2D905F416 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73F5E74F2513BB525C84E4DB /* HomeView.swift */; };
 /* End PBXBuildFile section */
 
@@ -44,11 +49,13 @@
 /* Begin PBXFileReference section */
 		0529E40ECB44E620D605ED33 /* AppSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppSettings.swift; sourceTree = "<group>"; };
 		1BC96021BA34A996CE0BBD1E /* CueGlide.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = CueGlide.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		2033F9DBFC4169400B3C2EF4 /* FloatingPrompterController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FloatingPrompterController.swift; sourceTree = "<group>"; };
 		276D08B2A164067D268F7FD0 /* Script.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Script.swift; sourceTree = "<group>"; };
 		2D7CFF61518D1201B8E7D0B9 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
 		30F7E6C6F3D48C5097BA9E01 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
 		3A472A5BFE65A1E8BE596C33 /* ScriptEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScriptEditorView.swift; sourceTree = "<group>"; };
 		3CF893D46050A8FCF154D637 /* ScriptListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScriptListView.swift; sourceTree = "<group>"; };
+		448B56BEC52A887104635AE7 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		50EC4C55AF543131DEFA5EC3 /* PrompterViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrompterViewModel.swift; sourceTree = "<group>"; };
 		52D73D4563133D6A8C364707 /* ScriptAlignerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScriptAlignerTests.swift; sourceTree = "<group>"; };
 		68D85B27204428A9E22C05C7 /* ScriptAligner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScriptAligner.swift; sourceTree = "<group>"; };
@@ -57,12 +64,15 @@
 		809E8C97087CEEAAFC956965 /* TemplatesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TemplatesView.swift; sourceTree = "<group>"; };
 		85A9A173815E50148C712545 /* CueGlideApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CueGlideApp.swift; sourceTree = "<group>"; };
 		8800E2F8CEB795EF76639BDC /* ScriptTokenizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScriptTokenizer.swift; sourceTree = "<group>"; };
+		88CB044AD3908283267B655C /* FloatingFrameRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FloatingFrameRenderer.swift; sourceTree = "<group>"; };
 		88D3DCE8ACB580DF243B11D5 /* PrompterRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrompterRenderer.swift; sourceTree = "<group>"; };
+		895F0435C1E92C1CEC2A4292 /* FloatingPrompterView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FloatingPrompterView.swift; sourceTree = "<group>"; };
 		89FD9E4805EB1DD8314633AC /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		A993F6A1375CCDCBE3A53EFA /* SpeechTracker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpeechTracker.swift; sourceTree = "<group>"; };
 		B18BF6DDF02ADF985D9F6324 /* ScrollEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScrollEngine.swift; sourceTree = "<group>"; };
 		B5D7DF1718DB3EE9B9FAF98D /* ScriptTemplate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScriptTemplate.swift; sourceTree = "<group>"; };
 		BBB054F0A2C6DFB4060ED3AD /* Format.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Format.swift; sourceTree = "<group>"; };
+		E48E6D08A29CA59FFB33BD14 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		F1E2BEE79DFA51F4C05A05B0 /* PromptConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PromptConfig.swift; sourceTree = "<group>"; };
 		F9258A1BB98A474FB61A02FF /* CueGlideTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = CueGlideTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		FC0F7CB91E50D109350E0D69 /* SampleText.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SampleText.swift; sourceTree = "<group>"; };
@@ -86,6 +96,7 @@
 				63F5FC5B7DFA3A41CE87583E /* DesignSystem */,
 				F23A554A2BB315590444B781 /* Features */,
 				476192A0CC3AE61C56D272E8 /* Models */,
+				6C308B246BD059DDD9E9864B /* Resources */,
 			);
 			path = CueGlide;
 			sourceTree = "<group>";
@@ -130,6 +141,24 @@
 			path = DesignSystem;
 			sourceTree = "<group>";
 		};
+		6A67A778EF5834041253EE4B /* PiP */ = {
+			isa = PBXGroup;
+			children = (
+				88CB044AD3908283267B655C /* FloatingFrameRenderer.swift */,
+				2033F9DBFC4169400B3C2EF4 /* FloatingPrompterController.swift */,
+			);
+			path = PiP;
+			sourceTree = "<group>";
+		};
+		6C308B246BD059DDD9E9864B /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				448B56BEC52A887104635AE7 /* Assets.xcassets */,
+				E48E6D08A29CA59FFB33BD14 /* PrivacyInfo.xcprivacy */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
 		721ABF7FA4F6C2A6D4EA8F5E /* Home */ = {
 			isa = PBXGroup;
 			children = (
@@ -157,6 +186,7 @@
 		B59760D3A4797AE3BC6AA0CE /* Core */ = {
 			isa = PBXGroup;
 			children = (
+				6A67A778EF5834041253EE4B /* PiP */,
 				26826431B3663A0CFDCEAA11 /* PromptEngine */,
 				DECC37D0042F93CBC0D1A322 /* Speech */,
 			);
@@ -201,6 +231,7 @@
 		E9A20AEA7AFD2B72AA05BA0B /* Prompter */ = {
 			isa = PBXGroup;
 			children = (
+				895F0435C1E92C1CEC2A4292 /* FloatingPrompterView.swift */,
 				7326E8DBDE9DC17176A2DE51 /* PrompterView.swift */,
 				50EC4C55AF543131DEFA5EC3 /* PrompterViewModel.swift */,
 			);
@@ -227,6 +258,7 @@
 			buildConfigurationList = 4F41D257F22B655B7C44985A /* Build configuration list for PBXNativeTarget "CueGlide" */;
 			buildPhases = (
 				AD7DD0FDB8D8D67EB0B0E805 /* Sources */,
+				286FB841DAAA054E23475F7F /* Resources */,
 			);
 			buildRules = (
 			);
@@ -294,6 +326,18 @@
 		};
 /* End PBXProject section */
 
+/* Begin PBXResourcesBuildPhase section */
+		286FB841DAAA054E23475F7F /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				69FFA7DBECC58C4006C42520 /* Assets.xcassets in Resources */,
+				EB074F299DA570B992B5A844 /* PrivacyInfo.xcprivacy in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
 /* Begin PBXSourcesBuildPhase section */
 		6471236E726821121E9B3D97 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
@@ -309,6 +353,9 @@
 			files = (
 				6C622880677CA0F1D8F7572A /* AppSettings.swift in Sources */,
 				913EC282D5F092B7EBC1804E /* CueGlideApp.swift in Sources */,
+				7804DC4905893DC9DCF3F777 /* FloatingFrameRenderer.swift in Sources */,
+				4FAD2285B26AD1A785F8DE56 /* FloatingPrompterController.swift in Sources */,
+				4046E2CA8CB23EBE0267B751 /* FloatingPrompterView.swift in Sources */,
 				5F09E76B887D10585E6BEA68 /* Format.swift in Sources */,
 				FC735D38FA0247D2D905F416 /* HomeView.swift in Sources */,
 				3EF14F0C9266BF24CBE8B7CB /* PromptConfig.swift in Sources */,
@@ -392,7 +439,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 0.1.0;
+				MARKETING_VERSION = 0.2.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -461,7 +508,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 0.1.0;
+				MARKETING_VERSION = 0.2.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
@@ -498,11 +545,14 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = CueGlide;
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_NSCameraUsageDescription = "提词拍摄需要使用相机，画面只在你的设备上处理。";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "MIT License";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "语音跟读与录像收音需要使用麦克风，音频只在你的设备上处理。";
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "保存录像到相册。";
 				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "语音跟读需要端侧语音识别，用于判断当前读到哪一句。";
@@ -551,11 +601,14 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = CueGlide;
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_NSCameraUsageDescription = "提词拍摄需要使用相机，画面只在你的设备上处理。";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "MIT License";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "语音跟读与录像收音需要使用麦克风，音频只在你的设备上处理。";
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "保存录像到相册。";
 				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "语音跟读需要端侧语音识别，用于判断当前读到哪一句。";
