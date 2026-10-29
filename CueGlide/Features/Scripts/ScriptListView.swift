@@ -139,6 +139,7 @@ struct ScriptListView: View {
             .frame(maxWidth: .infinity)
             .frame(height: 56)
             .background(Theme.brandSoft.opacity(0.55), in: .rect(cornerRadius: 14))
+            .accessibilityLabel("新建台本")
             .overlay {
                 RoundedRectangle(cornerRadius: 14)
                     .strokeBorder(Theme.brand.opacity(0.35), style: StrokeStyle(lineWidth: 1, dash: [5, 4]))
@@ -194,9 +195,10 @@ struct ScriptListView: View {
                     Image(systemName: "ellipsis")
                         .font(.system(size: 14, weight: .semibold))
                         .foregroundStyle(Theme.textTertiary)
-                        .frame(width: 32, height: 32)
+                        .frame(width: 44, height: 44)
                         .contentShape(Rectangle())
                 }
+                .accessibilityLabel("更多操作")
             }
 
             HStack(spacing: 10) {
@@ -219,6 +221,7 @@ struct ScriptListView: View {
                     .background(Theme.brandSoft, in: .capsule)
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel("开始提词：\(script.title.isEmpty ? "未命名台本" : script.title)")
             }
             .font(.system(size: 11))
             .foregroundStyle(Theme.textTertiary)

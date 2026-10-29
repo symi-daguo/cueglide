@@ -45,6 +45,7 @@ struct PrompterView: View {
                 countdownOverlay
             }
             .onAppear {
+                viewModel.onRequestExit = { dismiss() }
                 viewModel.configureVoice(localeIdentifier: appSettings.speechLocaleIdentifier)
                 viewModel.updateViewport(proxy.size)
                 UIApplication.shared.isIdleTimerDisabled = true
@@ -62,6 +63,7 @@ struct PrompterView: View {
             }
             .onDisappear {
                 viewModel.saveProgress()
+                viewModel.stopRemote()
                 UIApplication.shared.isIdleTimerDisabled = false
             }
             .onChange(of: proxy.size) { _, newSize in
@@ -121,6 +123,13 @@ struct PrompterView: View {
     private var gestureLayer: some View {
         Color.clear
             .contentShape(Rectangle())
+            .accessibilityElement()
+            .accessibilityLabel("提词内容区")
+            .accessibilityHint("双击播放或暂停，上下轻扫手动滚动")
+            .accessibilityAddTraits(.isButton)
+            .accessibilityAction {
+                viewModel.togglePlayback()
+            }
             .onTapGesture(count: 2) {
                 viewModel.togglePlayback()
             }
@@ -165,10 +174,11 @@ struct PrompterView: View {
                 } label: {
                     Image(systemName: "xmark")
                         .font(.system(size: 15, weight: .semibold))
-                        .frame(width: 38, height: 38)
+                        .frame(width: 44, height: 44)
                 }
                 .buttonStyle(.plain)
                 .glassEffect(.regular, in: .circle)
+                .accessibilityLabel("关闭提词")
 
                 Spacer()
 
@@ -179,10 +189,12 @@ struct PrompterView: View {
                 } label: {
                     Image(systemName: "arrow.left.arrow.right")
                         .font(.system(size: 14, weight: .semibold))
-                        .frame(width: 38, height: 38)
+                        .frame(width: 44, height: 44)
                 }
                 .buttonStyle(.plain)
                 .glassEffect(.regular, in: .circle)
+                .accessibilityLabel(viewModel.display.mirror == .none ? "开启水平镜像" : "关闭镜像")
+                .accessibilityAddTraits(viewModel.display.mirror == .none ? [] : .isSelected)
             }
             .padding(.horizontal, 16)
             .padding(.top, 46)
@@ -210,6 +222,12 @@ struct PrompterView: View {
                 Text(viewModel.progressLabel)
                     .font(.system(size: 11).monospacedDigit())
                 Spacer(minLength: 4)
+                if viewModel.remote.isConnected {
+                    Image(systemName: "keyboard")
+                        .font(.system(size: 10, weight: .medium))
+                        .opacity(0.7)
+                        .accessibilityLabel("已连接外接遥控")
+                }
                 Text("剩余 \(formatted(viewModel.remainingSeconds))")
                     .font(.system(size: 11).monospacedDigit())
                     .opacity(0.7)
@@ -236,17 +254,20 @@ struct PrompterView: View {
                 controlButton("backward.end.fill", caption: "回顶") {
                     viewModel.restart()
                 }
+                .accessibilityLabel("回到开头")
                 controlButton(
                     viewModel.engine.isRunning ? "pause.fill" : "play.fill",
                     prominent: true
                 ) {
                     viewModel.togglePlayback()
                 }
+                .accessibilityLabel(viewModel.engine.isRunning ? "暂停" : "播放")
                 .opacity(viewModel.scroll.mode == .voice ? 0.4 : 1)
                 .disabled(viewModel.scroll.mode == .voice)
                 controlButton("waveform", caption: "跟读", active: viewModel.isVoiceActive) {
                     viewModel.toggleVoice()
                 }
+                .accessibilityLabel(viewModel.isVoiceActive ? "关闭语音跟读" : "开启语音跟读")
                 controlButton(
                     "character",
                     caption: "\(Int(viewModel.display.fontSize))",
@@ -254,6 +275,7 @@ struct PrompterView: View {
                 ) {
                     toggleAdjust(.fontSize)
                 }
+                .accessibilityLabel("调整字号，当前 \(Int(viewModel.display.fontSize)) 磅")
                 controlButton(
                     "speedometer",
                     caption: viewModel.scroll.speedLabel,
@@ -261,6 +283,7 @@ struct PrompterView: View {
                 ) {
                     toggleAdjust(.speed)
                 }
+                .accessibilityLabel("调整速度，当前 \(viewModel.scroll.speedLabel)")
             }
         }
         .padding(12)
@@ -306,6 +329,8 @@ struct PrompterView: View {
                 step: 2
             )
             .tint(Color(uiColor: viewModel.display.palette.highlight))
+            .accessibilityLabel("字号")
+            .accessibilityValue("\(Int(viewModel.display.fontSize)) 磅")
             Text("\(Int(viewModel.display.fontSize))")
                 .font(.system(size: 11).monospacedDigit())
                 .frame(width: 26, alignment: .trailing)
@@ -332,6 +357,8 @@ struct PrompterView: View {
             )
             .tint(Color(uiColor: viewModel.display.palette.highlight))
             .disabled(viewModel.scroll.mode == .voice)
+            .accessibilityLabel("滚动速度")
+            .accessibilityValue("\(viewModel.scroll.speedLabel) \(viewModel.scroll.speedUnit)")
             Text(viewModel.scroll.speedUnit.isEmpty ? viewModel.scroll.speedLabel : viewModel.scroll.speedUnit)
                 .font(.system(size: 11))
                 .frame(width: 42, alignment: .trailing)

@@ -11,6 +11,7 @@ struct SettingsView: View {
                     displayGroup
                     scrollGroup
                     powerGroup
+                    remoteGroup
                     aboutGroup
                 }
                 .padding(.horizontal, 16)
@@ -226,6 +227,34 @@ struct SettingsView: View {
         }
     }
 
+    // MARK: - 遥控
+
+    private var remoteGroup: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            groupTitle("外接遥控")
+
+            card {
+                ForEach(Array(RemoteController.keyMap.enumerated()), id: \.offset) { index, pair in
+                    if index > 0 {
+                        divider
+                    }
+                    HStack {
+                        Text(pair.0)
+                            .font(.system(size: 14))
+                            .foregroundStyle(Theme.textPrimary)
+                        Spacer()
+                        Text(pair.1)
+                            .font(.system(size: 13))
+                            .foregroundStyle(Theme.textSecondary)
+                    }
+                    .padding(.vertical, 6)
+                }
+            }
+
+            hint("蓝牙演示器、翻页笔、脚踏开关在系统看来都是键盘，无需配对到应用内，连上系统即可使用。")
+        }
+    }
+
     // MARK: - 关于
 
     private var aboutGroup: some View {
@@ -334,7 +363,7 @@ struct SettingsView: View {
 
 extension Bundle {
     var appVersion: String {
-        let short = infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.3.0"
+        let short = infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.4.0"
         let build = infoDictionary?["CFBundleVersion"] as? String ?? "1"
         return "\(short) (\(build))"
     }

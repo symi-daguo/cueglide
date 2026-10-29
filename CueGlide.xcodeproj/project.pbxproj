@@ -11,6 +11,7 @@
 		04D227C33A6A552BDB89AF53 /* ScriptTemplate.swift in Sources */ = {isa = PBXBuildFile; fileRef = B5D7DF1718DB3EE9B9FAF98D /* ScriptTemplate.swift */; };
 		0E9D884E462E38EE1FEE56E5 /* SpeechTracker.swift in Sources */ = {isa = PBXBuildFile; fileRef = A993F6A1375CCDCBE3A53EFA /* SpeechTracker.swift */; };
 		1EBC81C1A2BDF8A328BCEF4E /* Script.swift in Sources */ = {isa = PBXBuildFile; fileRef = 276D08B2A164067D268F7FD0 /* Script.swift */; };
+		28741812933F962554C4D27F /* RemoteController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52E149ABE9791095B162570A /* RemoteController.swift */; };
 		36B29A3DBF9C5906D7D59FDB /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 89FD9E4805EB1DD8314633AC /* SettingsView.swift */; };
 		3EF14F0C9266BF24CBE8B7CB /* PromptConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1E2BEE79DFA51F4C05A05B0 /* PromptConfig.swift */; };
 		4046E2CA8CB23EBE0267B751 /* FloatingPrompterView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 895F0435C1E92C1CEC2A4292 /* FloatingPrompterView.swift */; };
@@ -62,6 +63,7 @@
 		448B56BEC52A887104635AE7 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		50EC4C55AF543131DEFA5EC3 /* PrompterViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrompterViewModel.swift; sourceTree = "<group>"; };
 		52D73D4563133D6A8C364707 /* ScriptAlignerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScriptAlignerTests.swift; sourceTree = "<group>"; };
+		52E149ABE9791095B162570A /* RemoteController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteController.swift; sourceTree = "<group>"; };
 		68D85B27204428A9E22C05C7 /* ScriptAligner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScriptAligner.swift; sourceTree = "<group>"; };
 		6FC296C6FABC4B668D086983 /* CaptureView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureView.swift; sourceTree = "<group>"; };
 		731E54652F46F1EB8B920B8F /* CameraController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraController.swift; sourceTree = "<group>"; };
@@ -203,6 +205,7 @@
 				7867BFE5B76CF92CAFBDB165 /* Capture */,
 				6A67A778EF5834041253EE4B /* PiP */,
 				26826431B3663A0CFDCEAA11 /* PromptEngine */,
+				F6779576E919DA09CFBC84F7 /* Remote */,
 				DECC37D0042F93CBC0D1A322 /* Speech */,
 			);
 			path = Core;
@@ -264,6 +267,14 @@
 				73D40FC8E343CB7CB788381D /* Templates */,
 			);
 			path = Features;
+			sourceTree = "<group>";
+		};
+		F6779576E919DA09CFBC84F7 /* Remote */ = {
+			isa = PBXGroup;
+			children = (
+				52E149ABE9791095B162570A /* RemoteController.swift */,
+			);
+			path = Remote;
 			sourceTree = "<group>";
 		};
 		FA00DB300FFE08F95DA44487 /* Capture */ = {
@@ -390,6 +401,7 @@
 				467B6C589996B1039D014033 /* PrompterRenderer.swift in Sources */,
 				E8360E5461E707F9BE301B87 /* PrompterView.swift in Sources */,
 				73E77E152647E416E3A3C2C4 /* PrompterViewModel.swift in Sources */,
+				28741812933F962554C4D27F /* RemoteController.swift in Sources */,
 				B0AC3F7370005C70D8BFF1BD /* RootView.swift in Sources */,
 				E75CF0037856F7CDFC79D898 /* SampleText.swift in Sources */,
 				1EBC81C1A2BDF8A328BCEF4E /* Script.swift in Sources */,
@@ -467,7 +479,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 0.3.0;
+				MARKETING_VERSION = 0.4.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -536,7 +548,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 0.3.0;
+				MARKETING_VERSION = 0.4.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;

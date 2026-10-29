@@ -145,6 +145,7 @@ struct HomeView: View {
                     .background(Theme.brand, in: .capsule)
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel("开始提词：\(script.title.isEmpty ? "未命名台本" : script.title)")
             }
         }
         .padding(20)
@@ -255,6 +256,8 @@ struct HomeView: View {
             .background(tint, in: .rect(cornerRadius: 16))
         }
         .buttonStyle(.plain)
+        .accessibilityLabel("\(title)，\(subtitle)")
+        .accessibilityAddTraits(.isButton)
     }
 
     // MARK: - 最近

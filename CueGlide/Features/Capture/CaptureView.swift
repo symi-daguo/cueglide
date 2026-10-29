@@ -103,10 +103,11 @@ struct CaptureView: View {
                 } label: {
                     Image(systemName: "xmark")
                         .font(.system(size: 15, weight: .semibold))
-                        .frame(width: 40, height: 40)
+                        .frame(width: 44, height: 44)
                 }
                 .buttonStyle(.plain)
                 .glassEffect(.regular, in: .circle)
+                .accessibilityLabel("关闭拍摄")
 
                 if viewModel.isRecording {
                     HStack(spacing: 6) {
@@ -129,10 +130,11 @@ struct CaptureView: View {
                 } label: {
                     Image(systemName: "arrow.triangle.2.circlepath.camera")
                         .font(.system(size: 15, weight: .semibold))
-                        .frame(width: 40, height: 40)
+                        .frame(width: 44, height: 44)
                 }
                 .buttonStyle(.plain)
                 .glassEffect(.regular, in: .circle)
+                .accessibilityLabel("切换前后摄像头")
                 .opacity(viewModel.isRecording ? 0.4 : 1)
                 .disabled(viewModel.isRecording)
             }
@@ -177,13 +179,16 @@ struct CaptureView: View {
             .foregroundStyle(.white)
 
             HStack(alignment: .center, spacing: 20) {
-                smallButton(prompter.engine.isRunning ? "pause.fill" : "play.fill") {
+                smallButton(
+                    prompter.engine.isRunning ? "pause.fill" : "play.fill",
+                    label: prompter.engine.isRunning ? "暂停提词" : "播放提词"
+                ) {
                     prompter.togglePlayback()
                 }
 
                 recordButton
 
-                smallButton("character") {
+                smallButton("character", label: "放大字号") {
                     prompter.adjustFontSize(4)
                 }
             }
@@ -212,11 +217,17 @@ struct CaptureView: View {
             }
         }
         .buttonStyle(.plain)
+        .accessibilityLabel(viewModel.isRecording ? "停止录制" : "开始录制")
+        .accessibilityValue(viewModel.isRecording ? viewModel.elapsedLabel : "")
         .disabled(viewModel.phase == .saving || !viewModel.isAvailable)
         .opacity((viewModel.phase == .saving || !viewModel.isAvailable) ? 0.4 : 1)
     }
 
-    private func smallButton(_ symbol: String, action: @escaping () -> Void) -> some View {
+    private func smallButton(
+        _ symbol: String,
+        label: String,
+        action: @escaping () -> Void
+    ) -> some View {
         Button(action: action) {
             Image(systemName: symbol)
                 .font(.system(size: 16, weight: .semibold))
@@ -224,6 +235,7 @@ struct CaptureView: View {
                 .frame(width: 52, height: 52)
         }
         .buttonStyle(.plain)
+        .accessibilityLabel(label)
     }
 }
 

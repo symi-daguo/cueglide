@@ -11,6 +11,7 @@ final class PrompterViewModel {
     let renderer: PrompterRenderer
     let engine = ScrollEngine()
     let tracker = SpeechTracker()
+    let remote = RemoteController()
 
     var display: DisplayConfig
     var scroll: ScrollConfig
@@ -22,6 +23,8 @@ final class PrompterViewModel {
     var adjustTarget: AdjustTarget = .none
     /// 语音跟读失败时的提示，非 nil 时弹横幅。
     var voiceAlert: String?
+    /// 遥控按 Esc 时要求退出，由界面层关闭页面。
+    @ObservationIgnored var onRequestExit: (() -> Void)?
 
     enum AdjustTarget: Equatable {
         case none
@@ -53,6 +56,13 @@ final class PrompterViewModel {
                 self?.handleVoiceAdvance(token)
             }
         }
+
+        remote.onCommand = { [weak self] command in
+            MainActor.assumeIsolated {
+                self?.handleRemote(command)
+            }
+        }
+        remote.start()
 
         renderer.hostView.onLayout = { [weak self] size in
             MainActor.assumeIsolated {
@@ -118,6 +128,50 @@ final class PrompterViewModel {
         lastKnownToken = Int(target.rounded())
         engine.seek(toTokenPosition: target)
         tracker.resync(to: lastKnownToken)
+    }
+
+    // MARK: - 遥控
+
+    private func handleRemote(_ command: RemoteController.Command) {
+        switch command {
+        case .togglePlayback:
+            togglePlayback()
+        case .speedUp:
+            adjustSpeed(factor: 1.15)
+        case .speedDown:
+            adjustSpeed(factor: 0.87)
+        case .jumpForward:
+            nudge(tokens: 12)
+            showControls()
+        case .jumpBackward:
+            nudge(tokens: -12)
+            showControls()
+        case .restart:
+            restart()
+        case .exit:
+            onRequestExit?()
+        }
+    }
+
+    /// 遥控调速按比例走，避免不同模式下步长不一致。
+    private func adjustSpeed(factor: Double) {
+        var next = scroll
+        switch next.mode {
+        case .constant:
+            next.pointsPerSecond *= factor
+        case .wpm:
+            next.wordsPerMinute *= factor
+        case .timed:
+            next.targetDuration /= factor
+        case .voice:
+            return
+        }
+        applyScroll(next)
+        showControls()
+    }
+
+    func stopRemote() {
+        remote.stop()
     }
 
     // MARK: - 语音跟读
