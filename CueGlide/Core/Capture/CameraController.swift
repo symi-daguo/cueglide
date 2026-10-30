@@ -1,11 +1,18 @@
-import AVFoundation
+// AVFoundation 的 Sendable 标注尚不完整，`AVCaptureDevice` 在串行队列里配置是安全的。
+// 用 @preconcurrency 按旧规则处理该模块，避免每处闭包都加一层包装。
+@preconcurrency import AVFoundation
 import UIKit
 
 /// 相机采集与录制。
 ///
 /// 关键设计：音视频都走 DataOutput 手动写文件，不用 AVCaptureMovieFileOutput。
-/// 原因是语音跟读也要麦克风，两条链路若各自开 session 会互相抢占；
-/// 这里一次采集，音频只读一份，同时喂给录制写入器和语音识别。
+/// 这样音频采样只来自一条链路，不会因为多个音频会话互相抢占而录到静音。
+///
+/// 注意：原计划把同一份音频同时喂给写入器和语音识别，`onAudioSample` 为此预留了接口，
+/// 但该接口目前没有接线。所以提词拍摄时禁止开启语音跟读，见 `CaptureViewModel`。
+///
+/// 关于 `@unchecked Sendable`：session、writer 与采样回调全部在 `captureQueue` 上串行执行，
+/// 少量跨队列读写的标量由 `NSLock` 保护，编译器无法推断这层约定，故显式标注。
 final class CameraController: NSObject, @unchecked Sendable {
 
     enum CaptureError: LocalizedError {

@@ -6,6 +6,7 @@ struct CaptureView: View {
 
     @State private var viewModel: CaptureViewModel
     @Environment(\.dismiss) private var dismiss
+    @Environment(AppSettings.self) private var appSettings
 
     init(script: Script, display: DisplayConfig, scroll: ScrollConfig) {
         _viewModel = State(
@@ -35,7 +36,7 @@ struct CaptureView: View {
             .onAppear {
                 prompter.configureVoice(localeIdentifier: "")
                 prompter.updateViewport(proxy.size)
-                UIApplication.shared.isIdleTimerDisabled = true
+                UIApplication.shared.isIdleTimerDisabled = appSettings.keepScreenAwake
                 Task { await viewModel.prepare() }
             }
             .onDisappear {

@@ -24,7 +24,7 @@ open CueGlide.xcodeproj
 
 ## 代码约定
 
-- 遵循 Swift 6 语言模式与完整并发检查，不要用 `@unchecked Sendable` 绕过。
+- 遵循 Swift 6 语言模式与完整并发检查。不要用 `@unchecked Sendable` 绕过并发检查；确实需要跨队列共享状态时（如相机采集），用锁保护并在类型注释里写清理由。
 - UI 层状态用 `@Observable`，不要引入 Combine。
 - 提词滚动的坐标统一用词索引，不要在业务层直接操作像素偏移。
 - 新增的可见文案一律用中文，注释也用中文。

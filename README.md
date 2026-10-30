@@ -20,6 +20,33 @@
 <img src="docs/screenshots/12-横屏-提词页.png" width="420" alt="横屏提词页">
 </p>
 
+<details>
+<summary>更多界面截图</summary>
+
+<p>
+<img src="docs/screenshots/03-设置-iPhone.png" width="200" alt="设置">
+<img src="docs/screenshots/06-台本-iPhone.png" width="200" alt="台本列表">
+<img src="docs/screenshots/07-提词调节-iPhone.png" width="200" alt="提词页调节">
+<img src="docs/screenshots/08-悬浮提词-iPhone.png" width="200" alt="悬浮提词">
+</p>
+
+<p>
+<img src="docs/screenshots/10-提词拍摄-iPhone.png" width="200" alt="提词拍摄">
+<img src="docs/screenshots/13-横屏-台本.png" width="400" alt="横屏台本">
+<img src="docs/screenshots/14-横屏-模板.png" width="400" alt="横屏模板">
+</p>
+
+<p>
+<img src="docs/screenshots/15-横屏-设置.png" width="400" alt="横屏设置">
+<img src="docs/screenshots/16-横屏-拍摄.png" width="400" alt="横屏拍摄">
+</p>
+
+<p>
+<img src="docs/screenshots/09-应用图标.png" width="96" alt="应用图标">
+</p>
+
+</details>
+
 ## 为什么又一个提词器
 
 市面上大多数提词器把语音跟读、镜像、外接屏这些核心能力放在付费墙后面，剩下的功能又堆满了 AI 写稿和数字人。
@@ -51,7 +78,10 @@ CueGlide 的方向相反：只做读稿这一件事，把它做扎实，全部�
 **规划中**
 
 - 外接屏与 AirPlay 输出
+- Apple Watch 与锁屏控制
+- 半折叠分屏：上半屏读稿，下半屏放控制
 - 字幕导出
+- 表达分析
 
 ## 系统要求
 
@@ -108,7 +138,7 @@ CueGlide/
     Capture/        提词拍摄
     Templates/      模板库
     Settings/       设置
-CueGlideTests/        单元测试（38 个用例）
+CueGlideTests/        单元测试（42 个用例）
 CueGlideUITests/      横竖屏截图测试
 docs/
   设计说明.md        产品边界、界面规格、核心算法、技术选型

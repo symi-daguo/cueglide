@@ -2,6 +2,30 @@
 
 本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)，格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)。
 
+## [0.6.5] - 2026-10-30
+
+全仓审查（ponytail 口径）后的修正，无新功能。
+
+### 修复
+
+- **「提词时屏幕常亮」开关不生效**：设置页有开关，`AppSettings` 也做了持久化，但提词页与拍摄页都无条件把 `isIdleTimerDisabled` 设成 `true`。用户关掉开关后屏幕照样常亮。现在两处都改成读 `appSettings.keepScreenAwake`
+- **断点续读进度没有显式落盘**：`saveProgress()` 只给 SwiftData 模型赋值，`PrompterView` 与 `PrompterViewModel` 里没有任何 `context.save()`，完全依赖自动保存。退出提词页后立刻被系统挂起时可能丢进度。现在 `onDisappear` 里显式保存
+
+### 清理
+
+- 删除 `PrompterViewModel.isIdleTimerDisabled`（定义后从未被读取，页面直接操作 `UIApplication`）
+- 删除 `PrompterView.dragStartToken`（定义后从未被使用）
+
+### 说明
+
+- 截图编号 05 是 0.6.1 删除「提词宽屏-iPad」后留下的空缺，后续新增图从 17 起编号，不回填以免破坏已发布的引用
+
+### 验证
+
+- 单元测试 42 个、UI 测试 3 个全部通过
+- 真机 Release 构建通过，产物 3.3 MB
+- 文档版本号、测试数量、截图引用全部对齐 0.6.5
+
 ## [0.6.4] - 2026-10-30
 
 按 Apple 对 iPhone Duo 的要求，把提词页的布局判断从宽高比改成尺寸类。

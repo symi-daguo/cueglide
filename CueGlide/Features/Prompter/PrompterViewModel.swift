@@ -18,7 +18,6 @@ final class PrompterViewModel {
 
     var controlsVisible = true
     var showsSettings = false
-    var isIdleTimerDisabled = false
     /// 当前正在调节哪一项，控制条据此展开对应的滑块。
     var adjustTarget: AdjustTarget = .none
     /// 语音跟读失败时的提示，非 nil 时弹横幅。

@@ -50,7 +50,7 @@ final class ScriptAlignerTests: XCTestCase {
         现在进入第二部分，我们讨论节奏控制。做法是一句话一停顿，逗号处稍作停留。
         最后是收尾，重复一次核心结论，提醒观众收藏。
         """
-        let (aligner, tokenized) = make(body)
+        let (aligner, _) = make(body)
         let tail = aligner.align(spoken: "最后是收尾重复一次核心结论", currentToken: 0)
         XCTAssertNotNil(tail)
         let back = aligner.align(spoken: "第一段讲基础概念", currentToken: tail!.tokenIndex)

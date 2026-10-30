@@ -1,4 +1,5 @@
 import SwiftUI
+import SwiftData
 import UIKit
 
 /// 提词页。全屏沉浸，文字层可镜像，控制层永远正向。
@@ -7,7 +8,7 @@ struct PrompterView: View {
     @State private var viewModel: PrompterViewModel
     @Environment(\.dismiss) private var dismiss
     @Environment(AppSettings.self) private var appSettings
-    @State private var dragStartToken: Int = 0
+    @Environment(\.modelContext) private var modelContext
     @Environment(\.verticalSizeClass) private var verticalSizeClass
     private let autoStartVoice: Bool
 
@@ -57,7 +58,7 @@ struct PrompterView: View {
                 viewModel.configureVoice(localeIdentifier: appSettings.speechLocaleIdentifier)
                 viewModel.updateTraits(isCompactHeight: isCompactHeight)
                 viewModel.updateViewport(proxy.size)
-                UIApplication.shared.isIdleTimerDisabled = true
+                UIApplication.shared.isIdleTimerDisabled = appSettings.keepScreenAwake
                 if ProcessInfo.processInfo.arguments.contains("-autoPlay") {
                     viewModel.togglePlayback()
                 }
@@ -72,6 +73,8 @@ struct PrompterView: View {
             }
             .onDisappear {
                 viewModel.saveProgress()
+                // 断点续读靠这一条，不能只依赖 SwiftData 的自动保存
+                try? modelContext.save()
                 viewModel.stopRemote()
                 UIApplication.shared.isIdleTimerDisabled = false
             }
