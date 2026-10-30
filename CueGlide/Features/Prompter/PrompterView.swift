@@ -8,6 +8,7 @@ struct PrompterView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(AppSettings.self) private var appSettings
     @State private var dragStartToken: Int = 0
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
     private let autoStartVoice: Bool
 
     init(script: Script, display: DisplayConfig, scroll: ScrollConfig, autoStartVoice: Bool = false) {
@@ -18,6 +19,12 @@ struct PrompterView: View {
     private var background: Color {
         Color(uiColor: viewModel.display.palette.background)
     }
+
+    /// 紧凑高度＝手机横屏或半折叠这类矮视口。
+    ///
+    /// 用尺寸类而不是宽高比：Duo 内屏在横竖两个姿态下都是 regular × regular，
+    /// 按宽高比会被误判成「横屏手机」，从而错误地收窄阅读列。
+    private var isCompactHeight: Bool { verticalSizeClass == .compact }
 
     var body: some View {
         GeometryReader { proxy in
@@ -48,6 +55,7 @@ struct PrompterView: View {
                 viewModel.onRequestExit = { dismiss() }
                 viewModel.startRemote()
                 viewModel.configureVoice(localeIdentifier: appSettings.speechLocaleIdentifier)
+                viewModel.updateTraits(isCompactHeight: isCompactHeight)
                 viewModel.updateViewport(proxy.size)
                 UIApplication.shared.isIdleTimerDisabled = true
                 if ProcessInfo.processInfo.arguments.contains("-autoPlay") {
@@ -69,6 +77,9 @@ struct PrompterView: View {
             }
             .onChange(of: proxy.size) { _, newSize in
                 viewModel.updateViewport(newSize)
+            }
+            .onChange(of: verticalSizeClass) { _, _ in
+                viewModel.updateTraits(isCompactHeight: isCompactHeight)
             }
         }
         .ignoresSafeArea()
@@ -203,18 +214,17 @@ struct PrompterView: View {
             Spacer()
 
             if viewModel.controlsVisible {
-                controlBar(isLandscape: size.width > size.height)
+                controlBar(compact: isCompactHeight)
                     .padding(.horizontal, 16)
-                    .padding(.bottom, size.width > size.height ? 12 : 44)
+                    .padding(.bottom, isCompactHeight ? 12 : 44)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
         .foregroundStyle(Color(uiColor: viewModel.display.palette.foreground))
     }
 
-    private func controlBar(isLandscape: Bool) -> some View {
-        let compact = isLandscape
-        return VStack(spacing: compact ? 6 : 9) {
+    private func controlBar(compact: Bool) -> some View {
+        VStack(spacing: compact ? 6 : 9) {
             HStack(spacing: 6) {
                 if !compact {
                     Text(viewModel.script.title.isEmpty ? "未命名台本" : viewModel.script.title)

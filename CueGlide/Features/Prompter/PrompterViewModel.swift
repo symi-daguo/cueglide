@@ -92,6 +92,17 @@ final class PrompterViewModel {
         renderer.highlight(currentToken: lastKnownToken)
     }
 
+    /// 尺寸类变化时同步给渲染层。
+    ///
+    /// 布局判断只认尺寸类：Duo 内屏横放时宽高比像「横屏手机」，但尺寸类仍是
+    /// regular × regular，应该继续用宽屏列宽，而不是压到 420。
+    func updateTraits(isCompactHeight: Bool) {
+        renderer.updateTraits(isCompactHeight: isCompactHeight)
+        guard renderer.isMeasured else { return }
+        syncMetrics()
+        renderer.scroll(toTokenPosition: Double(lastKnownToken), viewportHeight: viewportSize.height)
+    }
+
     private func syncMetrics() {
         engine.pointsPerToken = max(renderer.metrics.pointsPerToken, 1)
         engine.unitsPerToken = max(renderer.metrics.unitsPerToken, 0.1)

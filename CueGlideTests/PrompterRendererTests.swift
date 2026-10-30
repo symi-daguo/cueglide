@@ -26,13 +26,21 @@ final class PrompterRendererTests: XCTestCase {
     }
 
     /// 模拟一次真实布局：宿主容器拿到尺寸，文本视图撑满，然后重新测量。
-    private func layout(_ renderer: PrompterRenderer, width: CGFloat, height: CGFloat) {
+    ///
+    /// `isCompactHeight` 对应垂直尺寸类：手机横屏为 true；Duo 内屏无论横竖都是 false。
+    private func layout(
+        _ renderer: PrompterRenderer,
+        width: CGFloat,
+        height: CGFloat,
+        isCompactHeight: Bool = false
+    ) {
         let size = CGSize(width: width, height: height)
         renderer.hostView.frame = CGRect(origin: .zero, size: size)
         renderer.hostView.layoutIfNeeded()
         if renderer.textView.bounds.width < 1 || renderer.textView.bounds.height < 1 {
             renderer.textView.frame = CGRect(origin: .zero, size: size)
         }
+        renderer.updateTraits(isCompactHeight: isCompactHeight)
         renderer.setViewportHeight(height)
         renderer.updateWidth(width)
     }
@@ -47,19 +55,19 @@ final class PrompterRendererTests: XCTestCase {
 
     func testLandscapeAnchorRaisedTo22Percent() {
         let renderer = makeRenderer()
-        layout(renderer, width: 852, height: 393)
+        layout(renderer, width: 852, height: 393, isCompactHeight: true)
         XCTAssertEqual(renderer.textView.textContainerInset.top, 393 * 0.22, accuracy: 0.5)
     }
 
     func testLandscapeAnchorHas76PointFloor() {
         let renderer = makeRenderer()
-        layout(renderer, width: 800, height: 300)
+        layout(renderer, width: 800, height: 300, isCompactHeight: true)
         XCTAssertEqual(renderer.textView.textContainerInset.top, 76, accuracy: 0.5)
     }
 
     func testBottomInsetKeepsAtLeastOneLine() {
         let renderer = makeRenderer()
-        layout(renderer, width: 800, height: 120)
+        layout(renderer, width: 800, height: 120, isCompactHeight: true)
         XCTAssertGreaterThanOrEqual(renderer.textView.textContainerInset.bottom, 40)
     }
 
@@ -69,7 +77,7 @@ final class PrompterRendererTests: XCTestCase {
         var config = DisplayConfig.default
         config.horizontalInset = 28
         let renderer = makeRenderer(config: config)
-        layout(renderer, width: 852, height: 393)
+        layout(renderer, width: 852, height: 393, isCompactHeight: true)
 
         // 两侧各 28 + (852 - 420) / 2 = 244，把一行压到约 12 个字
         XCTAssertEqual(renderer.textView.textContainerInset.left, 244, accuracy: 0.5)
@@ -235,5 +243,73 @@ final class PrompterRendererTests: XCTestCase {
         XCTAssertFalse(renderer.isMeasured)
         XCTAssertEqual(renderer.contentY(forToken: 2), 0)
         XCTAssertEqual(renderer.tokenIndex(atViewportY: 100), 0)
+    }
+
+    // MARK: - iPhone Duo
+
+    /// 内屏无论竖放还是横放都是 regular × regular，横放不能按「横屏手机」把列宽压到 420。
+    func testDuoInnerScreenKeepsWideColumnInBothPoses() {
+        var config = DisplayConfig.default
+        config.horizontalInset = 28
+
+        let upright = makeRenderer(config: config)
+        layout(upright, width: 626, height: 890, isCompactHeight: false)
+        XCTAssertEqual(
+            upright.textView.textContainerInset.left,
+            28 + (626 - 560) / 2,
+            accuracy: 0.5,
+            "内屏竖放应按 560 列宽留白"
+        )
+        XCTAssertEqual(upright.textView.textContainerInset.top, 890 * 0.14, accuracy: 0.5)
+
+        let sideways = makeRenderer(config: config)
+        layout(sideways, width: 890, height: 626, isCompactHeight: false)
+        XCTAssertEqual(
+            sideways.textView.textContainerInset.left,
+            28 + (890 - 560) / 2,
+            accuracy: 0.5,
+            "内屏横放仍是 regular，列宽应保持 560 而不是 420"
+        )
+        XCTAssertEqual(
+            sideways.textView.textContainerInset.top,
+            626 * 0.14,
+            accuracy: 0.5,
+            "regular 高度不该把阅读线抬到 22%"
+        )
+    }
+
+    /// 外屏接近普通 iPhone 竖屏，宽度够不到 560 上限，不该额外加留白。
+    func testDuoOuterScreenUsesPhoneRules() {
+        var config = DisplayConfig.default
+        config.horizontalInset = 28
+        let renderer = makeRenderer(config: config)
+        layout(renderer, width: 466, height: 678, isCompactHeight: false)
+
+        XCTAssertEqual(renderer.textView.textContainerInset.left, 28, accuracy: 0.5)
+        XCTAssertEqual(renderer.textView.textContainerInset.top, 678 * 0.14, accuracy: 0.5)
+    }
+
+    /// 半折叠是「宽而矮、尺寸类仍是 regular」，阅读线必须靠绝对下限托住。
+    func testDuoHalfFoldedKeepsReadingLineAbove76() {
+        let renderer = makeRenderer()
+        layout(renderer, width: 890, height: 420, isCompactHeight: false)
+        XCTAssertEqual(renderer.textView.textContainerInset.top, 76, accuracy: 0.5)
+    }
+
+    /// 尺寸类切到紧凑后，同一份稿子的阅读列要立刻收窄（折叠姿态变化时走这条路径）。
+    func testTraitChangeNarrowsColumnWithoutRelayout() {
+        var config = DisplayConfig.default
+        config.horizontalInset = 28
+        let renderer = makeRenderer(config: config)
+        layout(renderer, width: 890, height: 626, isCompactHeight: false)
+        XCTAssertEqual(renderer.textView.textContainerInset.left, 28 + (890 - 560) / 2, accuracy: 0.5)
+
+        renderer.updateTraits(isCompactHeight: true)
+        XCTAssertEqual(
+            renderer.textView.textContainerInset.left,
+            28 + (890 - 420) / 2,
+            accuracy: 0.5,
+            "切到紧凑高度后应收窄到 420 列宽"
+        )
     }
 }

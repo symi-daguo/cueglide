@@ -199,27 +199,41 @@ final class PrompterRenderer {
     private let portraitReadingColumn: CGFloat = 560
     private let landscapeReadingColumn: CGFloat = 420
 
+    /// 是否为紧凑高度（手机横屏、半折叠等矮视口）。
+    ///
+    /// 用尺寸类而不是「宽 > 高」判断，是 Apple 对 iPhone Duo 的明确要求：
+    /// 内屏无论竖放还是横放都是 regular × regular，按宽高比会把横放的内屏
+    /// 误判成「手机横屏」，于是把阅读列错误地压到 420、把阅读线抬到 22%。
+    private(set) var isCompactHeight = false
+
+    /// 尺寸类变化时重算内边距并重新测量。
+    func updateTraits(isCompactHeight: Bool) {
+        guard isCompactHeight != self.isCompactHeight else { return }
+        self.isCompactHeight = isCompactHeight
+        textView.textContainerInset = insets(for: viewportHeight, width: textView.bounds.width)
+        measure()
+    }
+
     /// 阅读线以上留出整段空白，保证第 0 个词也落在阅读线上而不是顶到状态栏。
     ///
-    /// 横屏时屏幕高度只有竖屏的一半左右，按同一比例算会把首行顶到按钮底下，
-    /// 所以横屏抬到至少 22%，并给一个绝对下限。
+    /// 紧凑高度下屏幕只剩一半，按同一比例算会把首行顶到按钮底下，
+    /// 所以抬到至少 22%，并给一个绝对下限。
     private func insets(for height: CGFloat, width: CGFloat = 0) -> UIEdgeInsets {
         let availableWidth = width > 1 ? width : textView.bounds.width
-        let isLandscape = availableWidth > height && height > 0
 
-        let ratio = isLandscape
+        let ratio = isCompactHeight
             ? max(config.readingLine.viewportRatio, 0.22)
             : config.readingLine.viewportRatio
 
         var anchor: CGFloat = height > 0 ? height * ratio : 120
-        if isLandscape {
-            anchor = max(anchor, 76)
-        }
+        // 顶部按钮占 46 + 44，任何姿态下都要给首行留出这段。
+        // Duo 半折叠是「宽而矮、但尺寸类仍是 regular」的形态，只有这条能兜住。
+        anchor = max(anchor, 76)
 
         // 底部至少留一行，避免最后一段永远滚不上来
         let bottom = max(height - anchor - 40, 40)
 
-        let maxColumn = isLandscape ? landscapeReadingColumn : portraitReadingColumn
+        let maxColumn = isCompactHeight ? landscapeReadingColumn : portraitReadingColumn
         let extraSide = max((availableWidth - maxColumn) / 2, 0)
         let side = config.horizontalInset + extraSide
 
