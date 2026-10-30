@@ -2,6 +2,7 @@
 // 用 @preconcurrency 按旧规则处理该模块，避免每处闭包都加一层包装。
 @preconcurrency import AVFoundation
 import UIKit
+import os
 
 /// 相机采集与录制。
 ///
@@ -44,11 +45,18 @@ final class CameraController: NSObject, @unchecked Sendable {
     var onAudioSample: ((CMSampleBuffer) -> Void)?
 
     private let captureQueue = DispatchQueue(label: "com.symi.cueglide.capture")
+    private let log = Logger(subsystem: "com.symi.cueglide", category: "Camera")
     private let videoOutput = AVCaptureVideoDataOutput()
     private let audioOutput = AVCaptureAudioDataOutput()
 
     private var videoInput: AVCaptureDeviceInput?
     private var audioInput: AVCaptureDeviceInput?
+
+    /// 预览层由 UI 持有生命周期，这里只弱引用。
+    private weak var previewLayer: AVCaptureVideoPreviewLayer?
+    /// 必须强引用：coordinator 释放后 KVO 就不再送角度了。
+    private var rotationCoordinator: AVCaptureDevice.RotationCoordinator?
+    private var rotationObservation: NSKeyValueObservation?
 
     /// 用锁保护跨队列读写的少量标量，录制写入器本身只在 captureQueue 上被操作。
     private let stateLock = NSLock()
@@ -141,11 +149,18 @@ final class CameraController: NSObject, @unchecked Sendable {
         session.beginConfiguration()
         defer { session.commitConfiguration() }
 
-        session.sessionPreset = .high
+        // 要让设备跑在最高分辨率，必须用 inputPriority 把格式的控制权拿回来。
+        // 用 .high 时系统会把 activeFormat 压到 1080p 一档，前置 4K 根本用不上。
+        if session.canSetSessionPreset(.inputPriority) {
+            session.sessionPreset = .inputPriority
+        }
 
         for input in session.inputs {
             session.removeInput(input)
         }
+
+        // 先定格式再装 input，否则 input 会按设备默认格式接线
+        try configureDevice(device)
 
         let deviceInput = try AVCaptureDeviceInput(device: device)
         guard session.canAddInput(deviceInput) else { throw CaptureError.cannotConfigure }
@@ -161,8 +176,11 @@ final class CameraController: NSObject, @unchecked Sendable {
         }
 
         if session.outputs.isEmpty {
+            // 录制走硬件编码器，420v 是采集管线和编码器都原生支持的格式。
+            // 用 32BGRA 每帧要多做一次色彩转换，4K 下直接吃掉帧率。
             videoOutput.videoSettings = [
-                kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA
+                kCVPixelBufferPixelFormatTypeKey as String:
+                    kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange
             ]
             videoOutput.alwaysDiscardsLateVideoFrames = true
             videoOutput.setSampleBufferDelegate(self, queue: captureQueue)
@@ -177,9 +195,6 @@ final class CameraController: NSObject, @unchecked Sendable {
         }
 
         if let connection = videoOutput.connection(with: .video) {
-            if connection.isVideoRotationAngleSupported(90) {
-                connection.videoRotationAngle = 90
-            }
             if connection.isVideoMirroringSupported {
                 connection.isVideoMirrored = device.position == .front
             }
@@ -189,15 +204,138 @@ final class CameraController: NSObject, @unchecked Sendable {
         _position = device.position
         _isConfigured = true
         stateLock.unlock()
+
+        // 旋转不再写死 90 度，交给系统按设备姿态算
+        rebuildRotationCoordinator(for: device)
+
+        let dims = CMVideoFormatDescriptionGetDimensions(device.activeFormat.formatDescription)
+        let fps = device.activeVideoMinFrameDuration.timescale > 0
+            ? Int((Double(device.activeVideoMinFrameDuration.timescale) / Double(device.activeVideoMinFrameDuration.value)).rounded())
+            : 0
+        log.info(
+            "相机就绪：\(device.localizedName, privacy: .public) \(dims.width, privacy: .public)×\(dims.height, privacy: .public) @\(fps, privacy: .public)fps，格式数 \(device.formats.count, privacy: .public)"
+        )
     }
 
+    /// 把设备调到它能给出的最高视频格式。
+    ///
+    /// 前置相机在 iPhone 上是横向传感器，竖着拿靠旋转校正，所以这里只挑分辨率，
+    /// 方向交给 `RotationCoordinator`。
+    private func configureDevice(_ device: AVCaptureDevice) throws {
+        guard let format = Self.bestVideoFormat(for: device) else { return }
+
+        try device.lockForConfiguration()
+        defer { device.unlockForConfiguration() }
+
+        device.activeFormat = format
+
+        // 目标 30fps：提词拍摄不需要高帧率，4K 下 60fps 反而容易掉帧。
+        // 但必须夹在格式自己支持的区间里——有些高帧率格式最低就是 60，
+        // 直接设 30 会设置失败。
+        let range = format.videoSupportedFrameRateRanges.first { $0.maxFrameRate >= 30 }
+        let target = min(max(30, range?.minFrameRate ?? 30), range?.maxFrameRate ?? 30)
+        let duration = CMTime(value: 1, timescale: CMTimeScale(target.rounded()))
+        device.activeVideoMinFrameDuration = duration
+        device.activeVideoMaxFrameDuration = duration
+    }
+
+    private static func bestVideoFormat(for device: AVCaptureDevice) -> AVCaptureDevice.Format? {
+        let options = device.formats.map { format -> VideoFormatOption in
+            let dims = CMVideoFormatDescriptionGetDimensions(format.formatDescription)
+            let maxRate = format.videoSupportedFrameRateRanges.map(\.maxFrameRate).max() ?? 0
+            return VideoFormatOption(
+                width: dims.width,
+                height: dims.height,
+                maxFrameRate: maxRate
+            )
+        }
+        guard let index = preferredFormatIndex(in: options) else { return nil }
+        return device.formats[index]
+    }
+
+    /// 相机格式的候选描述。抽成值类型，选择逻辑才能单独测。
+    struct VideoFormatOption: Equatable {
+        let width: Int32
+        let height: Int32
+        let maxFrameRate: Double
+
+        var pixels: Int { Int(width) * Int(height) }
+
+        /// 视频标准比例。前置偶尔会给出 4:3 的静止图像格式，
+        /// 那种格式像素更多但录制会变形，优先 16:9。
+        var isWidescreen: Bool {
+            guard height > 0 else { return false }
+            let ratio = Double(width) / Double(height)
+            return abs(ratio - 16.0 / 9.0) < 0.06
+        }
+
+        var isUsable: Bool { width > 0 && height > 0 && maxFrameRate >= 30 }
+    }
+
+    /// 挑分辨率最高的 16:9 格式，且必须支持 30fps。
+    /// 没有 16:9 就退回最高分辨率，避免个别机型只有 4:3 时反而降档。
+    static func preferredFormatIndex(in options: [VideoFormatOption]) -> Int? {
+        let usable = options.enumerated().filter { $0.element.isUsable }
+        let widescreen = usable.filter { $0.element.isWidescreen }
+        let pool = widescreen.isEmpty ? usable : widescreen
+        return pool.max { $0.element.pixels < $1.element.pixels }?.offset
+    }
+
+    // MARK: - 旋转
+
+    /// 把预览层交给控制器。`videoRotationAngleForHorizonLevelPreview`
+    /// 在没有预览层时恒为 0，预览方向就对不上了。
+    func attachPreviewLayer(_ layer: AVCaptureVideoPreviewLayer) {
+        previewLayer = layer
+        rebuildRotationCoordinator(for: videoInput?.device)
+    }
+
+    private func rebuildRotationCoordinator(for device: AVCaptureDevice?) {
+        rotationObservation = nil
+        rotationCoordinator = nil
+        guard let device else { return }
+
+        let coordinator = AVCaptureDevice.RotationCoordinator(device: device, previewLayer: previewLayer)
+        rotationCoordinator = coordinator
+
+        rotationObservation = coordinator.observe(
+            \.videoRotationAngleForHorizonLevelCapture,
+            options: [.initial, .new]
+        ) { [weak self] coordinator, _ in
+            self?.applyRotation(
+                preview: coordinator.videoRotationAngleForHorizonLevelPreview,
+                capture: coordinator.videoRotationAngleForHorizonLevelCapture
+            )
+        }
+    }
+
+    /// 预览与采集各用各的角度：这两者在部分姿态下并不相等。
+    /// 录制中不更新，否则像素尺寸会中途变化，写入器直接写坏。
+    private func applyRotation(preview: CGFloat, capture: CGFloat) {
+        guard !isRecording else { return }
+
+        DispatchQueue.main.async { [weak self] in
+            guard let connection = self?.previewLayer?.connection,
+                  connection.isVideoRotationAngleSupported(preview) else { return }
+            connection.videoRotationAngle = preview
+        }
+
+        captureQueue.async { [weak self] in
+            guard let self,
+                  let connection = self.videoOutput.connection(with: .video),
+                  connection.isVideoRotationAngleSupported(capture) else { return }
+            connection.videoRotationAngle = capture
+        }
+    }
+
+    /// 明确要主摄（wide）。超广角画质更差、暗光噪点更多，
+    /// 之前用 `devices.first` 拿到的顺序并不保证，可能落到超广角上。
     private static func device(for position: AVCaptureDevice.Position) -> AVCaptureDevice? {
-        let types: [AVCaptureDevice.DeviceType] = [
-            .builtInWideAngleCamera,
-            .builtInUltraWideCamera
-        ]
+        if let wide = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: position) {
+            return wide
+        }
         let discovery = AVCaptureDevice.DiscoverySession(
-            deviceTypes: types,
+            deviceTypes: [.builtInWideAngleCamera, .builtInUltraWideCamera],
             mediaType: .video,
             position: position
         )
@@ -259,6 +397,9 @@ final class CameraController: NSObject, @unchecked Sendable {
                     self.stateLock.lock()
                     self._position = device.position
                     self.stateLock.unlock()
+
+                    // 换了镜头，原生方向可能不同，必须重建
+                    self.rebuildRotationCoordinator(for: device)
                     continuation.resume()
                 } catch {
                     continuation.resume(throwing: error)
@@ -289,6 +430,14 @@ final class CameraController: NSObject, @unchecked Sendable {
                 self.writer = nil
                 Task {
                     let url = await current.finish()
+                    // 录制期间角度被锁住，设备如果在录制中转过，结束后不会再收到
+                    // KVO 更新，必须主动重建一次，否则预览与采集都停在旧角度。
+                    // AVCaptureDevice 不是 Sendable，这里按 position 重新取，
+                    // 不跨队列传设备对象。
+                    let position = self.position
+                    DispatchQueue.main.async {
+                        self.rebuildRotationCoordinator(for: Self.device(for: position))
+                    }
                     continuation.resume(returning: url)
                 }
             }
@@ -336,6 +485,7 @@ extension CameraController {
             let newWriter = try RecordingWriter(outputURL: url, videoSize: size)
             writer = newWriter
             newWriter.start()
+            log.info("录制开始：\(newWriter.summary, privacy: .public)")
         } catch {
             // 建不起来就把临时文件清掉，界面会因为没有写入器而回到未录制状态
             try? FileManager.default.removeItem(at: url)
@@ -352,20 +502,27 @@ final class RecordingWriter {
     private let videoInput: AVAssetWriterInput
     private let audioInput: AVAssetWriterInput
     private let outputURL: URL
+    private let videoSize: CGSize
+    private let codec: AVVideoCodecType
     private var started = false
     private var sessionStarted = false
 
     init(outputURL: URL, videoSize: CGSize) throws {
         self.outputURL = outputURL
+        self.videoSize = videoSize
         try? FileManager.default.removeItem(at: outputURL)
 
-        writer = try AVAssetWriter(outputURL: outputURL, fileType: .mov)
+        let assetWriter = try AVAssetWriter(outputURL: outputURL, fileType: .mov)
+        writer = assetWriter
 
-        let videoSettings: [String: Any] = [
-            AVVideoCodecKey: AVVideoCodecType.h264,
-            AVVideoWidthKey: Int(videoSize.width),
-            AVVideoHeightKey: Int(videoSize.height)
-        ]
+        // HEVC 同画质码率约为 H.264 的一半，iPhone 全系有硬件编码；
+        // 万一当前尺寸不支持再退回 H.264。
+        let hevcSettings = Self.videoSettings(size: videoSize, codec: .hevc)
+        let chosen: AVVideoCodecType =
+            assetWriter.canApply(outputSettings: hevcSettings, forMediaType: .video) ? .hevc : .h264
+        self.codec = chosen
+        let videoSettings = Self.videoSettings(size: videoSize, codec: chosen)
+
         videoInput = AVAssetWriterInput(mediaType: .video, outputSettings: videoSettings)
         videoInput.expectsMediaDataInRealTime = true
 
@@ -382,6 +539,38 @@ final class RecordingWriter {
         }
         writer.add(videoInput)
         writer.add(audioInput)
+    }
+
+    /// 按像素折算码率。之前不设码率，系统给的默认值在 1080p 以上明显偏紧，
+    /// 4K 会糊成一片。系数按系统相机的实测水平取：HEVC 0.18 bit/像素/帧
+    /// 对应 4K30 约 45Mbps，H.264 需要 0.26 才追得平。
+    static func videoSettings(size: CGSize, codec: AVVideoCodecType) -> [String: Any] {
+        let bitRate = Self.averageBitRate(for: size, codec: codec)
+
+        return [
+            AVVideoCodecKey: codec,
+            AVVideoWidthKey: Int(size.width),
+            AVVideoHeightKey: Int(size.height),
+            AVVideoCompressionPropertiesKey: [
+                AVVideoAverageBitRateKey: bitRate,
+                AVVideoExpectedSourceFrameRateKey: 30,
+                AVVideoMaxKeyFrameIntervalKey: 30
+            ]
+        ]
+    }
+
+    /// 码率按像素折算：0.18 bit/像素/帧对应 4K30 约 45Mbps，接近系统相机水平。
+    /// 低于 8Mbps 时画面会明显发糊，设个下限兜住小尺寸。
+    static func averageBitRate(for size: CGSize, codec: AVVideoCodecType) -> Int {
+        let pixels = Double(size.width) * Double(size.height)
+        let bitsPerPixel = codec == .hevc ? 0.18 : 0.26
+        return max(8_000_000, Int(pixels * 30 * bitsPerPixel))
+    }
+
+    /// 成片里记录的编码器与分辨率，用于界面提示与排查。
+    var summary: String {
+        let dims = "\(Int(videoSize.width))×\(Int(videoSize.height))"
+        return "\(dims) \(codec == .hevc ? "HEVC" : "H.264")"
     }
 
     func start() {

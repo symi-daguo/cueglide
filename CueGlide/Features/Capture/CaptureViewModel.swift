@@ -109,13 +109,32 @@ final class CaptureViewModel {
 
         do {
             try await saveToPhotoLibrary(url: url)
-            lastSavedMessage = "已保存到相册"
+            let info = await Self.recordingInfo(for: url)
+            lastSavedMessage = info.map { "已保存到相册 · \($0)" } ?? "已保存到相册"
         } catch {
             lastSavedMessage = "保存失败：\(error.localizedDescription)"
         }
 
         try? FileManager.default.removeItem(at: url)
         phase = .ready
+    }
+
+    /// 读成片实际写入的分辨率与编码器。拍摄参数是否真的生效，
+    /// 看这一行就够了，不用去相册翻详情。
+    private static func recordingInfo(for url: URL) async -> String? {
+        let asset = AVURLAsset(url: url)
+        guard let track = try? await asset.loadTracks(withMediaType: .video).first,
+              let size = try? await track.load(.naturalSize),
+              let formats = try? await track.load(.formatDescriptions),
+              let format = formats.first else { return nil }
+
+        let codecName: String
+        switch CMFormatDescriptionGetMediaSubType(format) {
+        case kCMVideoCodecType_HEVC: codecName = "HEVC"
+        case kCMVideoCodecType_H264: codecName = "H.264"
+        default: codecName = "未知编码"
+        }
+        return "\(Int(size.width))×\(Int(size.height)) \(codecName)"
     }
 
     private func saveToPhotoLibrary(url: URL) async throws {

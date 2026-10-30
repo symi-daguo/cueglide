@@ -7,6 +7,7 @@ struct CaptureView: View {
     @State private var viewModel: CaptureViewModel
     @Environment(\.dismiss) private var dismiss
     @Environment(AppSettings.self) private var appSettings
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
 
     init(script: Script, display: DisplayConfig, scroll: ScrollConfig) {
         _viewModel = State(
@@ -16,13 +17,16 @@ struct CaptureView: View {
 
     private var prompter: PrompterViewModel { viewModel.prompter }
 
+    /// 紧凑高度＝横屏。按钮内边距按它收，横屏时才不会压掉画面。
+    private var isCompactHeight: Bool { verticalSizeClass == .compact }
+
     var body: some View {
         GeometryReader { proxy in
             ZStack {
                 Color.black.ignoresSafeArea()
 
                 if viewModel.isAvailable {
-                    CameraPreview(session: viewModel.camera.session)
+                    CameraPreview(controller: viewModel.camera)
                         .ignoresSafeArea()
                 } else {
                     Color.black.ignoresSafeArea()
@@ -133,7 +137,7 @@ struct CaptureView: View {
             }
             .foregroundStyle(.white)
             .padding(.horizontal, 16)
-            .padding(.top, 54)
+            .padding(.top, isCompactHeight ? 16 : 54)
 
             Spacer()
 
@@ -148,8 +152,11 @@ struct CaptureView: View {
             }
 
             bottomBar
+                // 横屏下屏宽接近 900pt，控制条拉满会显得松散，也压掉更多画面；
+                // 限宽居中，和提词列宽的处理保持一致。
+                .frame(maxWidth: isCompactHeight ? 480 : .infinity)
                 .padding(.horizontal, 16)
-                .padding(.bottom, 44)
+                .padding(.bottom, isCompactHeight ? 16 : 44)
         }
     }
 
@@ -245,19 +252,22 @@ private struct PrompterHostViewRepresentable: UIViewRepresentable {
 }
 
 private struct CameraPreview: UIViewRepresentable {
-    let session: AVCaptureSession
+    let controller: CameraController
 
     func makeUIView(context: Context) -> PreviewContainer {
         let view = PreviewContainer()
-        view.previewLayer.session = session
+        view.previewLayer.session = controller.session
         view.previewLayer.videoGravity = .resizeAspectFill
         view.layer.addSublayer(view.previewLayer)
+        // 预览层要交给控制器：RotationCoordinator 的预览角度依赖它，
+        // 不传的话横过来预览还是竖的。
+        controller.attachPreviewLayer(view.previewLayer)
         return view
     }
 
     func updateUIView(_ uiView: PreviewContainer, context: Context) {
-        if uiView.previewLayer.session !== session {
-            uiView.previewLayer.session = session
+        if uiView.previewLayer.session !== controller.session {
+            uiView.previewLayer.session = controller.session
             uiView.setNeedsLayout()
         }
     }
