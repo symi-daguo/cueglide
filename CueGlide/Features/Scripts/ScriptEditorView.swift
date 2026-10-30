@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import UIKit
 
 struct ScriptEditorView: View {
 
@@ -64,6 +65,10 @@ struct ScriptEditorView: View {
                     }
                     .disabled(script.body.isEmpty)
                 }
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button("收起键盘") { dismissKeyboard() }
+                }
             }
             .fullScreenCover(item: $activeScript) { target in
                 PrompterView(
@@ -118,6 +123,16 @@ struct ScriptEditorView: View {
             guard !Task.isCancelled else { return }
             script.refreshDerivedFields()
         }
+    }
+
+    /// 收起键盘。编辑长稿时键盘会挡住正文，需要一个明确的收起点。
+    private func dismissKeyboard() {
+        UIApplication.shared.sendAction(
+            #selector(UIResponder.resignFirstResponder),
+            to: nil,
+            from: nil,
+            for: nil
+        )
     }
 
     private func close() {

@@ -26,6 +26,7 @@ struct RootView: View {
             }
         }
         .task {
+            cleanStoreIfRequested()
             seedSampleIfNeeded()
             handleLaunchArguments()
         }
@@ -55,6 +56,7 @@ struct RootView: View {
     /// - `-openFloating` / `-openCapture` 打开悬浮提词 / 提词拍摄
     /// - `-stressPrompt` 注入万字长稿并进提词页，用于性能压测
     /// - `-fpsProbe` 打开帧率采样，结果输出到系统日志
+    /// - `-cleanStore` 清空本地台本并重新播种示例，让自动化验证从固定状态开始
     private func handleLaunchArguments() {
         let args = ProcessInfo.processInfo.arguments
 
@@ -75,6 +77,20 @@ struct RootView: View {
             return fallback
         }()
         deepLinkScript = target
+    }
+
+    /// `-cleanStore`：清空台本并允许重新播种示例。
+    ///
+    /// UI 测试每次启动都从同一状态开始，避免上一轮创建的台本污染列表与截图。
+    /// 仅在启动参数命中时执行，正常启动不碰用户数据。
+    private func cleanStoreIfRequested() {
+        guard ProcessInfo.processInfo.arguments.contains("-cleanStore") else { return }
+        let existing = scripts
+        for script in existing {
+            context.delete(script)
+        }
+        try? context.save()
+        settings.hasInsertedSampleScript = false
     }
 
     /// 首次启动塞一篇示例稿，让用户点开就能看到真实滚动效果。

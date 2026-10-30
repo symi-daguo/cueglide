@@ -16,22 +16,24 @@ final class OrientationSnapshotTests: XCTestCase {
     }
 
     /// 竖屏逐页截图。
+    @MainActor
     func testPortraitScreens() {
         let app = XCUIApplication()
-        app.launchArguments = []
+        app.launchArguments = ["-cleanStore"]
         XCUIDevice.shared.orientation = .portrait
         app.launch()
         sleep(3)
         snapshot("01-竖屏-首页")
 
         app.terminate()
-        app.launchArguments = ["-openPrompter"]
+        app.launchArguments = ["-cleanStore", "-openPrompter"]
         app.launch()
         sleep(3)
         snapshot("02-竖屏-提词页")
     }
 
     /// 横屏逐页截图。
+    @MainActor
     func testLandscapeScreens() {
         let app = XCUIApplication()
         // 相机与麦克风的系统弹窗会挡住布局，统一点「允许」，没有弹窗时忽略
@@ -46,37 +48,37 @@ final class OrientationSnapshotTests: XCTestCase {
             return false
         }
         XCUIDevice.shared.orientation = .landscapeLeft
-        app.launchArguments = []
+        app.launchArguments = ["-cleanStore"]
         app.launch()
         sleep(4)
         snapshot("11-横屏-首页")
 
         app.terminate()
-        app.launchArguments = ["-openPrompter"]
+        app.launchArguments = ["-cleanStore", "-openPrompter"]
         app.launch()
         sleep(4)
         snapshot("12-横屏-提词页")
 
         app.terminate()
-        app.launchArguments = ["-tabScripts"]
+        app.launchArguments = ["-cleanStore", "-tabScripts"]
         app.launch()
         sleep(3)
         snapshot("13-横屏-台本")
 
         app.terminate()
-        app.launchArguments = ["-tabTemplates"]
+        app.launchArguments = ["-cleanStore", "-tabTemplates"]
         app.launch()
         sleep(3)
         snapshot("14-横屏-模板")
 
         app.terminate()
-        app.launchArguments = ["-tabSettings"]
+        app.launchArguments = ["-cleanStore", "-tabSettings"]
         app.launch()
         sleep(3)
         snapshot("15-横屏-设置")
 
         app.terminate()
-        app.launchArguments = ["-openCapture"]
+        app.launchArguments = ["-cleanStore", "-openCapture"]
         app.launch()
         sleep(3)
         app.tap()

@@ -7,9 +7,10 @@
 用 Swift 6 与 SwiftUI 编写，基于 iOS 26 及以上，支持 iPhone、iPad 与 iPhone Duo 折叠屏。
 
 <p>
-<img src="docs/screenshots/01-首页-iPhone.png" width="240" alt="首页">
-<img src="docs/screenshots/02-提词页-iPhone.png" width="240" alt="提词页">
-<img src="docs/screenshots/04-模板-iPhone.png" width="240" alt="模板">
+<img src="docs/screenshots/01-首页-iPhone.png" width="210" alt="首页">
+<img src="docs/screenshots/02-提词页-iPhone.png" width="210" alt="提词页">
+<img src="docs/screenshots/17-编辑台本-iPhone.png" width="210" alt="台本编辑">
+<img src="docs/screenshots/04-模板-iPhone.png" width="210" alt="模板">
 </p>
 
 横屏下同一套布局会自动收窄留白、压缩控制条：
@@ -107,7 +108,7 @@ CueGlide/
     Capture/        提词拍摄
     Templates/      模板库
     Settings/       设置
-CueGlideTests/        单元测试（22 个用例）
+CueGlideTests/        单元测试（38 个用例）
 CueGlideUITests/      横竖屏截图测试
 docs/
   设计说明.md        产品边界、界面规格、核心算法、技术选型

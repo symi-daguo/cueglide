@@ -204,7 +204,9 @@ struct ScriptListView: View {
     }
 
     private func createScript() {
-        let script = Script(title: "未命名台本", body: "")
+        // 标题留空，用户点进来直接写就行，不用先删掉占位标题。
+        // 列表卡片对空标题有「未命名台本」回退显示。
+        let script = Script(title: "", body: "")
         context.insert(script)
         try? context.save()
         editingScript = script
