@@ -76,6 +76,7 @@ struct PrompterView: View {
                 // 断点续读靠这一条，不能只依赖 SwiftData 的自动保存
                 try? modelContext.save()
                 viewModel.stopRemote()
+                viewModel.teardownVoice()
                 UIApplication.shared.isIdleTimerDisabled = false
             }
             .onChange(of: proxy.size) { _, newSize in

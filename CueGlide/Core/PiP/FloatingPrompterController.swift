@@ -96,6 +96,11 @@ final class FloatingPrompterController: NSObject {
         }
 
         guard let pip else { return }
+
+        // 画中画要求 app 处于「正在播放媒体」的状态：音频会话必须是播放类且已激活，
+        // 否则 isPictureInPicturePossible 一直返回 false。这一步不能省。
+        activateAudioSession()
+
         guard pip.isPictureInPicturePossible else {
             state = .failed("画中画暂时不可用，稍后再试，或先播放任意视频让系统就绪。")
             return
@@ -113,7 +118,20 @@ final class FloatingPrompterController: NSObject {
         timer = nil
         pip?.stopPictureInPicture()
         pip = nil
+        deactivateAudioSession()
         state = .stopped
+    }
+
+    // MARK: - 音频会话
+
+    private func activateAudioSession() {
+        let session = AVAudioSession.sharedInstance()
+        try? session.setCategory(.playback, mode: .moviePlayback, options: [])
+        try? session.setActive(true, options: [])
+    }
+
+    private func deactivateAudioSession() {
+        try? AVAudioSession.sharedInstance().setActive(false, options: [.notifyOthersOnDeactivation])
     }
 
     func togglePlay() {
@@ -195,10 +213,13 @@ final class FloatingPrompterController: NSObject {
         )
         guard let sampleBuffer else { return }
 
-        if displayLayer.status == .failed {
-            displayLayer.flush()
+        // iOS 18 起 AVSampleBufferDisplayLayer 的 status/flush/enqueue 都迁到了
+        // sampleBufferRenderer 上，旧接口已废弃。
+        let videoRenderer = displayLayer.sampleBufferRenderer
+        if videoRenderer.status == .failed {
+            videoRenderer.flush()
         }
-        displayLayer.enqueue(sampleBuffer)
+        videoRenderer.enqueue(sampleBuffer)
     }
 }
 

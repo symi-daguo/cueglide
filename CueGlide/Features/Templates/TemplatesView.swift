@@ -20,6 +20,7 @@ struct TemplatesView: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
+                    PageHeader(title: "模板", subtitle: "选一个场景骨架，改成自己的话")
                     scenePicker
 
                     LazyVGrid(columns: columns, spacing: 12) {
@@ -36,7 +37,7 @@ struct TemplatesView: View {
                 .frame(maxWidth: .infinity)
             }
             .background(Theme.canvas)
-            .navigationTitle("模板")
+            .toolbar(.hidden, for: .navigationBar)
             .sheet(item: $createdScript) { script in
                 ScriptEditorView(script: script)
             }

@@ -2,6 +2,33 @@
 
 本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)，格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)。
 
+## [0.6.6] - 2026-10-30
+
+修掉语音跟读在真机上点开即闪退的问题。根因是 Swift 6 的隔离断言被音频实时线程触发，模拟器上永远复现不出来。
+
+### 修复
+
+- **点「跟读」闪退（真机必现）**：音频 tap 闭包原本定义在 `@MainActor` 类 `SpeechTracker` 内。SDK 把 `AVAudioNodeTapBlock` 标成 `NS_SWIFT_NONSENDABLE`，非 Sendable 闭包在 `@MainActor` 上下文里会继承主执行器隔离，编译器随之在闭包入口插入 `_checkExpectedExecutor` 断言。而 AVAudioEngine 的回调跑在实时线程，一进闭包就断言失败、SIGTRAP。采集已拆到不带 `@MainActor` 的 `SpeechAudioCapture`，闭包不再继承任何执行器隔离
+- **音频会话选项违规**：`.record` 类别配了 `.duckOthers`。SDK 明确写明 DuckOthers 只对 Ambient / PlayAndRecord / Playback / MultiRoute 有效，配 `.record` 会抛 `IncompatibleCategory`，跟读永远起不来。改为不带选项
+- **`removeTap` 无防护**：未装 tap 时调用 `removeTap` 抛的是 ObjC 异常，Swift 的 `do/catch` 拦不住，进程直接崩。补 `tapInstalled` 标志
+- **退出提词页不释放麦克风**：`onDisappear` 保存了进度、停了遥控、重置了常亮，唯独没停跟读。开着跟读直接关闭页面时，音频会话一直 active、`AVAudioEngine` 继续跑，麦克风被占着直到下次操作或系统挂起 App。补 `teardownVoice()` 在页面退出时释放
+
+### 新增
+
+- 语音跟读全链路日志（`os.Logger`，subsystem `com.symi.cueglide`）：权限获取、识别器启动、采集启动、进入监听四个节点各有打点，真机出问题时一条 `log stream` 就能看出卡在哪一步
+- `SpeechAudioCaptureTests` 两个用例：未启动即停止、重复停止均不崩溃
+- 单元测试 42 → 44
+
+### 验证
+
+- 隔离断言静态核验：同样的 `installTap` 代码放在 `@MainActor` 类里，编译产物的 SIL 引用 **49** 处 `_checkExpectedExecutor`；放在非隔离类里为 **0**。本轮 `SpeechAudioCapture.o` 实测为 0
+- 44 个单元测试 0 失败
+- 模拟器实测：进入跟读流程不再闪退，日志正常输出「开始准备语音跟读」，随后卡在权限请求
+
+### 说明
+
+- 本机（Mac Studio）没有内置麦克风，模拟器也不提供麦克风与语音识别的权限服务，音频采集链路无法在模拟器验证，跟读必须真机确认
+
 ## [0.6.5] - 2026-10-30
 
 全仓审查（ponytail 口径）后的修正，无新功能。

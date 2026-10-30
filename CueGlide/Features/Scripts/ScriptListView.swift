@@ -55,6 +55,8 @@ struct ScriptListView: View {
         NavigationStack {
             ScrollView {
                 LazyVStack(spacing: 12) {
+                    header
+                    searchField
                     newScriptCard
 
                     ForEach(filtered) { script in
@@ -74,31 +76,7 @@ struct ScriptListView: View {
                 .frame(maxWidth: .infinity)
             }
             .background(Theme.canvas)
-            .navigationTitle("台本")
-            .searchable(text: $query, placement: .navigationBarDrawer(displayMode: .always), prompt: "搜索标题或正文")
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Menu {
-                        Picker("排序", selection: $sort) {
-                            ForEach(ScriptSort.allCases) { option in
-                                Text(option.displayName).tag(option)
-                            }
-                        }
-                        Divider()
-                        Button("新建台本", systemImage: "plus") {
-                            createScript()
-                        }
-                        Button("从粘贴板导入", systemImage: "doc.on.clipboard") {
-                            importFromClipboard()
-                        }
-                        Button("从文件导入", systemImage: "folder") {
-                            showingImporter = true
-                        }
-                    } label: {
-                        Image(systemName: "ellipsis.circle")
-                    }
-                }
-            }
+            .toolbar(.hidden, for: .navigationBar)
             .sheet(item: $editingScript) { script in
                 ScriptEditorView(script: script)
             }
@@ -146,6 +124,69 @@ struct ScriptListView: View {
             } message: {
                 Text("删除后无法恢复，录像文件不受影响。")
             }
+        }
+    }
+
+    // MARK: - 页头
+
+    private var header: some View {
+        PageHeader(
+            title: "台本",
+            subtitle: "共 \(scripts.count) 篇 · 按\(sort.displayName)排序"
+        ) {
+            Menu {
+                Picker("排序", selection: $sort) {
+                    ForEach(ScriptSort.allCases) { option in
+                        Text(option.displayName).tag(option)
+                    }
+                }
+                Divider()
+                Button("新建台本", systemImage: "plus") {
+                    createScript()
+                }
+                Button("从粘贴板导入", systemImage: "doc.on.clipboard") {
+                    importFromClipboard()
+                }
+                Button("从文件导入", systemImage: "folder") {
+                    showingImporter = true
+                }
+            } label: {
+                Image(systemName: "ellipsis.circle")
+                    .font(.system(size: 17, weight: .medium))
+                    .foregroundStyle(Theme.textSecondary)
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
+            }
+            .accessibilityLabel("更多操作")
+        }
+    }
+
+    private var searchField: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 14, weight: .medium))
+                .foregroundStyle(Theme.textTertiary)
+            TextField("搜索标题或正文", text: $query)
+                .font(.system(size: 15))
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+            if !query.isEmpty {
+                Button {
+                    query = ""
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 14))
+                        .foregroundStyle(Theme.textTertiary)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("清除搜索")
+            }
+        }
+        .padding(.horizontal, 12)
+        .frame(height: 42)
+        .background(Theme.surface, in: .rect(cornerRadius: 12))
+        .overlay {
+            RoundedRectangle(cornerRadius: 12).stroke(Theme.hairline, lineWidth: 0.5)
         }
     }
 

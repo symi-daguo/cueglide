@@ -26,6 +26,24 @@ final class OrientationSnapshotTests: XCTestCase {
         snapshot("01-竖屏-首页")
 
         app.terminate()
+        app.launchArguments = ["-cleanStore", "-tabScripts"]
+        app.launch()
+        sleep(3)
+        snapshot("06-竖屏-台本")
+
+        app.terminate()
+        app.launchArguments = ["-cleanStore", "-tabTemplates"]
+        app.launch()
+        sleep(3)
+        snapshot("04-竖屏-模板")
+
+        app.terminate()
+        app.launchArguments = ["-cleanStore", "-tabSettings"]
+        app.launch()
+        sleep(3)
+        snapshot("03-竖屏-设置")
+
+        app.terminate()
         app.launchArguments = ["-cleanStore", "-openPrompter"]
         app.launch()
         sleep(3)

@@ -13,7 +13,7 @@ settings:
     SWIFT_STRICT_CONCURRENCY: complete
     SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY: YES
     ENABLE_USER_SCRIPT_SANDBOXING: YES
-    MARKETING_VERSION: "0.6.5"
+    MARKETING_VERSION: "0.6.6"
     CURRENT_PROJECT_VERSION: "1"
     CODE_SIGN_STYLE: Automatic
     DEAD_CODE_STRIPPING: YES
@@ -25,31 +25,46 @@ targets:
     deploymentTarget: "26.0"
     sources:
       - path: CueGlide
+    info:
+      path: CueGlide/Resources/Info.plist
+      properties:
+        CFBundleDevelopmentRegion: zh-Hans
+        CFBundleDisplayName: CueGlide
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
+        CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
+        ITSAppUsesNonExemptEncryption: false
+        UIBackgroundModes:
+          - audio
+        NSCameraUsageDescription: 提词拍摄需要使用相机，画面只在你的设备上处理。
+        NSMicrophoneUsageDescription: 语音跟读与录像收音需要使用麦克风，音频只在你的设备上处理。
+        NSSpeechRecognitionUsageDescription: 语音跟读需要端侧语音识别，用于判断当前读到哪一句。
+        NSPhotoLibraryAddUsageDescription: 保存录像到相册。
+        NSHumanReadableCopyright: MIT License
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: true
+        UIApplicationSupportsIndirectInputEvents: true
+        UIUserInterfaceStyle: Automatic
+        UILaunchScreen: {}
+        UIStatusBarStyle: UIStatusBarStyleDefault
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        UISupportedInterfaceOrientations~ipad:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.symi.cueglide
         PRODUCT_NAME: CueGlide
         TARGETED_DEVICE_FAMILY: "1,2"
-        GENERATE_INFOPLIST_FILE: YES
-        INFOPLIST_KEY_CFBundleDisplayName: CueGlide
-        INFOPLIST_KEY_UILaunchScreen_Generation: YES
-        INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
-        INFOPLIST_KEY_UIStatusBarStyle: UIStatusBarStyleDefault
-        INFOPLIST_KEY_NSCameraUsageDescription: 提词拍摄需要使用相机，画面只在你的设备上处理。
-        INFOPLIST_KEY_NSMicrophoneUsageDescription: 语音跟读与录像收音需要使用麦克风，音频只在你的设备上处理。
-        INFOPLIST_KEY_NSSpeechRecognitionUsageDescription: 语音跟读需要端侧语音识别，用于判断当前读到哪一句。
-        INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription: 保存录像到相册。
-        INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents: YES
-        INFOPLIST_KEY_UIUserInterfaceStyle: Automatic
-        INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone: "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
-        INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad: "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
         SUPPORTS_MACCATALYST: NO
         SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD: NO
         ENABLE_PREVIEWS: YES
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
-        INFOPLIST_KEY_ITSAppUsesNonExemptEncryption: NO
-        INFOPLIST_KEY_NSHumanReadableCopyright: "MIT License" 
 
   CueGlideTests:
     type: bundle.unit-test

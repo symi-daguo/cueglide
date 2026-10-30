@@ -217,6 +217,16 @@ final class PrompterViewModel {
         remote.stop()
     }
 
+    /// 退出提词页时释放麦克风与识别器。
+    ///
+    /// 不停的话，音频会话会一直保持 active、AVAudioEngine 继续跑，麦克风被占着，
+    /// 直到下次进页面手动关掉或系统把 App 挂起。跟读的启停是异步的，这里丢给
+    /// 全局并发执行，不阻塞页面退出。
+    func teardownVoice() {
+        guard tracker.state.isActive else { return }
+        Task { await tracker.stop() }
+    }
+
     // MARK: - 语音跟读
 
     func configureVoice(localeIdentifier: String) {

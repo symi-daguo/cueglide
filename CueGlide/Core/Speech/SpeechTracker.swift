@@ -2,6 +2,7 @@ import Foundation
 import Speech
 import AVFoundation
 import Observation
+import os
 
 /// 端侧语音跟读。用 iOS 26 的 SpeechAnalyzer 做流式转写，把识别结果交给 ScriptAligner
 /// 推算出当前读到的位置，再驱动提词滚动。
@@ -33,8 +34,9 @@ final class SpeechTracker {
 
     @ObservationIgnored private var analyzer: SpeechAnalyzer?
     @ObservationIgnored private var transcriber: SpeechTranscriber?
-    @ObservationIgnored private var engine: AVAudioEngine?
+    @ObservationIgnored private var capture: SpeechAudioCapture?
     @ObservationIgnored private var continuation: AsyncStream<AnalyzerInput>.Continuation?
+    @ObservationIgnored private let log = Logger(subsystem: "com.symi.cueglide", category: "SpeechTracker")
     @ObservationIgnored private var resultsTask: Task<Void, Never>?
     @ObservationIgnored private var aligner: ScriptAligner?
     @ObservationIgnored private var accumulated = ""
@@ -71,13 +73,17 @@ final class SpeechTracker {
         pendingJumpToken = nil
         latestTranscript = ""
 
+        log.info("开始准备语音跟读")
         do {
             try await requestPermissions()
+            log.info("麦克风与语音识别权限已获取")
             let locale = resolveLocale()
-            try await prepareAnalyzer(locale: locale)
-            try startAudioEngine()
+            let format = try await prepareAnalyzer(locale: locale)
+            try await startCapture(format: format)
             state = .listening
+            log.info("语音跟读已进入监听状态")
         } catch {
+            log.error("语音跟读启动失败：\(error.localizedDescription, privacy: .public)")
             await teardown()
             state = .unavailable(error.localizedDescription)
         }
@@ -91,22 +97,36 @@ final class SpeechTracker {
     // MARK: - 权限
 
     private func requestPermissions() async throws {
-        let micGranted = await withCheckedContinuation { continuation in
-            AVAudioApplication.requestRecordPermission { granted in
-                continuation.resume(returning: granted)
-            }
-        }
+        let micGranted = await Self.requestRecordPermission()
         guard micGranted else {
             throw TrackerError.microphoneDenied
         }
 
-        let speechStatus = await withCheckedContinuation { continuation in
+        let speechStatus = await Self.requestSpeechAuthorization()
+        guard speechStatus == .authorized else {
+            throw TrackerError.speechDenied
+        }
+    }
+
+    /// 这两个请求必须放在 `nonisolated` 里。
+    ///
+    /// 系统的权限回调（TCC）跑在后台队列。如果直接在 `@MainActor` 方法里用
+    /// `withCheckedContinuation`，continuation 会绑定到主执行器，后台 `resume` 时
+    /// Swift 6 的隔离断言会直接触发 SIGTRAP——真机上点「跟读」就闪退，模拟器因
+    /// 权限已缓存、不走回调，所以一直没暴露。
+    private nonisolated static func requestRecordPermission() async -> Bool {
+        await withCheckedContinuation { continuation in
+            AVAudioApplication.requestRecordPermission { granted in
+                continuation.resume(returning: granted)
+            }
+        }
+    }
+
+    private nonisolated static func requestSpeechAuthorization() async -> SFSpeechRecognizerAuthorizationStatus {
+        await withCheckedContinuation { continuation in
             SFSpeechRecognizer.requestAuthorization { status in
                 continuation.resume(returning: status)
             }
-        }
-        guard speechStatus == .authorized else {
-            throw TrackerError.speechDenied
         }
     }
 
@@ -117,7 +137,8 @@ final class SpeechTracker {
         return trimmed.isEmpty ? Locale.current : Locale(identifier: trimmed)
     }
 
-    private func prepareAnalyzer(locale: Locale) async throws {
+    /// 准备识别器，返回它期望的音频格式。
+    private func prepareAnalyzer(locale: Locale) async throws -> AVAudioFormat {
         let supported = await SpeechTranscriber.supportedLocales
         let target = locale.identifier(.bcp47)
         guard supported.contains(where: { $0.identifier(.bcp47) == target }) else {
@@ -151,7 +172,8 @@ final class SpeechTracker {
 
         try await analyzer.start(inputSequence: stream)
         startConsumingResults(transcriber: transcriber)
-        configureCapture(format: analyzerFormat)
+        log.info("识别器已启动，目标格式 \(analyzerFormat.sampleRate, privacy: .public)Hz")
+        return analyzerFormat
     }
 
     private func startConsumingResults(transcriber: SpeechTranscriber) {
@@ -172,66 +194,15 @@ final class SpeechTracker {
 
     // MARK: - 音频采集
 
-    @ObservationIgnored private var converter: AVAudioConverter?
-    @ObservationIgnored private var captureFormat: AVAudioFormat?
-
-    private func configureCapture(format: AVAudioFormat) {
-        captureFormat = format
-    }
-
-    private func startAudioEngine() throws {
-        let session = AVAudioSession.sharedInstance()
-        try session.setCategory(.record, mode: .measurement, options: [.duckOthers])
-        try session.setActive(true, options: [])
-
-        let engine = AVAudioEngine()
-        let input = engine.inputNode
-        let inputFormat = input.outputFormat(forBus: 0)
-        guard inputFormat.sampleRate > 0 else {
-            throw TrackerError.micUnavailable
+    /// 采集放在 `SpeechAudioCapture` 里——那个类不带 `@MainActor`，
+    /// 音频 tap 闭包才不会继承主执行器隔离，否则实时线程一回调就 SIGTRAP。
+    private func startCapture(format: AVAudioFormat) async throws {
+        guard let continuation else {
+            throw TrackerError.audioFormatUnavailable
         }
-
-        let targetFormat = captureFormat ?? inputFormat
-        let converter = AVAudioConverter(from: inputFormat, to: targetFormat)
-        self.converter = converter
-
-        input.installTap(onBus: 0, bufferSize: 4096, format: inputFormat) { [weak self] buffer, _ in
-            guard let self else { return }
-            // 音频线程：只做格式转换与投递，不碰主线程状态
-            let outBuffer = Self.convert(buffer, using: converter, to: targetFormat) ?? buffer
-            self.continuation?.yield(AnalyzerInput(buffer: outBuffer))
-        }
-
-        engine.prepare()
-        try engine.start()
-        self.engine = engine
-    }
-
-    private nonisolated static func convert(
-        _ buffer: AVAudioPCMBuffer,
-        using converter: AVAudioConverter?,
-        to format: AVAudioFormat
-    ) -> AVAudioPCMBuffer? {
-        guard let converter else { return buffer }
-        let ratio = format.sampleRate / buffer.format.sampleRate
-        let capacity = AVAudioFrameCount(Double(buffer.frameLength) * ratio) + 64
-        guard let output = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: capacity) else {
-            return nil
-        }
-
-        var supplied = false
-        var error: NSError?
-        converter.convert(to: output, error: &error) { _, status in
-            if supplied {
-                status.pointee = .noDataNow
-                return nil
-            }
-            supplied = true
-            status.pointee = .haveData
-            return buffer
-        }
-        guard error == nil, output.frameLength > 0 else { return nil }
-        return output
+        let capture = SpeechAudioCapture()
+        try await capture.start(targetFormat: format, continuation: continuation)
+        self.capture = capture
     }
 
     // MARK: - 对齐
@@ -285,9 +256,8 @@ final class SpeechTracker {
         resultsTask?.cancel()
         resultsTask = nil
 
-        engine?.inputNode.removeTap(onBus: 0)
-        engine?.stop()
-        engine = nil
+        await capture?.stop()
+        capture = nil
 
         continuation?.finish()
         continuation = nil
@@ -297,10 +267,6 @@ final class SpeechTracker {
         }
         analyzer = nil
         transcriber = nil
-        converter = nil
-        captureFormat = nil
-
-        try? AVAudioSession.sharedInstance().setActive(false, options: [.notifyOthersOnDeactivation])
     }
 
     // MARK: - 错误
@@ -308,7 +274,6 @@ final class SpeechTracker {
     enum TrackerError: LocalizedError {
         case microphoneDenied
         case speechDenied
-        case micUnavailable
         case audioFormatUnavailable
         case unsupportedLocale(String)
 
@@ -318,8 +283,6 @@ final class SpeechTracker {
                 "没有麦克风权限。到系统设置里允许 CueGlide 使用麦克风再试。"
             case .speechDenied:
                 "没有语音识别权限。到系统设置里允许 CueGlide 使用语音识别再试。"
-            case .micUnavailable:
-                "当前没有可用的麦克风输入。"
             case .audioFormatUnavailable:
                 "无法准备语音识别的音频格式。"
             case .unsupportedLocale(let name):

@@ -8,6 +8,7 @@ struct SettingsView: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
+                    PageHeader(title: "设置", subtitle: "提词默认参数与偏好")
                     displayGroup
                     scrollGroup
                     powerGroup
@@ -15,13 +16,12 @@ struct SettingsView: View {
                     aboutGroup
                 }
                 .padding(.horizontal, 16)
-                .padding(.top, 4)
                 .padding(.bottom, 100)
                 .frame(maxWidth: 720)
                 .frame(maxWidth: .infinity)
             }
             .background(Theme.canvas)
-            .navigationTitle("设置")
+            .toolbar(.hidden, for: .navigationBar)
         }
     }
 
@@ -363,7 +363,7 @@ struct SettingsView: View {
 
 extension Bundle {
     var appVersion: String {
-        let short = infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.6.5"
+        let short = infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.6.6"
         let build = infoDictionary?["CFBundleVersion"] as? String ?? "1"
         return "\(short) (\(build))"
     }
