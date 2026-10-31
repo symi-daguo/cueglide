@@ -49,10 +49,11 @@ final class CameraController: NSObject, @unchecked Sendable {
 
     private let captureQueue = DispatchQueue(label: "com.symi.cueglide.capture")
     private let log = Logger(subsystem: "com.symi.cueglide", category: "Camera")
-    /// 录制交给官方的 MovieFileOutput：编码参数、方向、HDR 全由系统管线决定，
-    /// 和系统相机是同一套。之前自己拼 VideoDataOutput + AssetWriter，等于把
-    /// 系统已经做好的事重做一遍，还做不过它。
-    private let movieOutput = AVCaptureMovieFileOutput()
+    /// 录制走 VideoDataOutput + AssetWriter。
+    ///
+    /// `AVCaptureMovieFileOutput` 画质更好，但录制方向只跟设备物理方向，
+    /// 无法做到「竖着拿直接拍横片」。方向可控优先，编码参数交给系统默认。
+    private let videoOutput = AVCaptureVideoDataOutput()
     /// 仅用于把音频分流给语音跟读，不参与录制。
     private let audioOutput = AVCaptureAudioDataOutput()
 
@@ -72,8 +73,8 @@ final class CameraController: NSObject, @unchecked Sendable {
     private let stateLock = NSLock()
     private var _position: AVCaptureDevice.Position = .front
     private var _isConfigured = false
-    /// 等待 MovieFileOutput 录音结束的信号。
-    private var _recordingContinuation: CheckedContinuation<URL?, Never>?
+    private var _recorder: VideoRecorder?
+    private var _pendingRecordingURL: URL?
 
     var position: AVCaptureDevice.Position {
         stateLock.lock()
@@ -94,17 +95,34 @@ final class CameraController: NSObject, @unchecked Sendable {
         return _isHDREnabled
     }
 
-    var isRecording: Bool { movieOutput.isRecording }
+    var isRecording: Bool {
+        stateLock.lock()
+        defer { stateLock.unlock() }
+        return _recorder != nil || _pendingRecordingURL != nil
+    }
 
-    private var recordingContinuation: CheckedContinuation<URL?, Never>? {
+    private var recorder: VideoRecorder? {
         get {
             stateLock.lock()
             defer { stateLock.unlock() }
-            return _recordingContinuation
+            return _recorder
         }
         set {
             stateLock.lock()
-            _recordingContinuation = newValue
+            _recorder = newValue
+            stateLock.unlock()
+        }
+    }
+
+    private var pendingRecordingURL: URL? {
+        get {
+            stateLock.lock()
+            defer { stateLock.unlock() }
+            return _pendingRecordingURL
+        }
+        set {
+            stateLock.lock()
+            _pendingRecordingURL = newValue
             stateLock.unlock()
         }
     }
@@ -176,10 +194,15 @@ final class CameraController: NSObject, @unchecked Sendable {
 
         // MovieFileOutput 不设 outputSettings，让系统按设备当前格式自己决定
         // 编码器、码率与色彩——这才是"用官方管线"的意思。
-        // MovieFileOutput 与 AudioDataOutput 不能共用同一路音频，同时挂着会让录制
-        // 静默失败（isRecording 一直是 false）。平时挂 AudioDataOutput 供跟读分流，
-        // 录制时再整体切给 MovieFileOutput，录完换回来。
+        // 视频与音频各一个 DataOutput：视频进录制器，音频同时进录制器和跟读分流，
+        // 这样录制时也能跟读（MovieFileOutput 独占音频，做不到这点）。
         if session.outputs.isEmpty {
+            videoOutput.alwaysDiscardsLateVideoFrames = true
+            videoOutput.setSampleBufferDelegate(self, queue: captureQueue)
+            if session.canAddOutput(videoOutput) {
+                session.addOutput(videoOutput)
+            }
+
             audioOutput.setSampleBufferDelegate(self, queue: captureQueue)
             if session.canAddOutput(audioOutput) {
                 session.addOutput(audioOutput)
@@ -190,12 +213,12 @@ final class CameraController: NSObject, @unchecked Sendable {
         let actualHDR = device.activeColorSpace == .HLG_BT2020
 
         log.info(
-            "输出状态：movie=\(self.session.outputs.contains(self.movieOutput), privacy: .public) audio=\(self.session.outputs.contains(self.audioOutput), privacy: .public) 音频输入=\(self.session.inputs.contains { ($0 as? AVCaptureDeviceInput)?.device.hasMediaType(.audio) == true }, privacy: .public)"
+            "输出状态：video=\(self.session.outputs.contains(self.videoOutput), privacy: .public) audio=\(self.session.outputs.contains(self.audioOutput), privacy: .public) 音频输入=\(self.session.inputs.contains { ($0 as? AVCaptureDeviceInput)?.device.hasMediaType(.audio) == true }, privacy: .public)"
         )
 
         // 录制取真实方向，不做镜像——系统相机的前置成片就是这样，
         // 镜像会让画面里的文字、手势全反。预览的镜像由预览层单独处理。
-        if let connection = movieOutput.connection(with: .video),
+        if let connection = videoOutput.connection(with: .video),
            connection.isVideoMirroringSupported {
             connection.isVideoMirrored = false
         }
@@ -375,7 +398,7 @@ final class CameraController: NSObject, @unchecked Sendable {
         }
 
         let angle = Self.captureAngle(for: lastInterfaceOrientation)
-        let connection = movieOutput.connection(with: .video)
+        let connection = videoOutput.connection(with: .video)
         log.info(
             "旋转应用：界面=\(self.lastInterfaceOrientation.rawValue, privacy: .public) 角度=\(angle, privacy: .public) 支持=\(connection?.isVideoRotationAngleSupported(angle) ?? false, privacy: .public)"
         )
@@ -483,7 +506,7 @@ final class CameraController: NSObject, @unchecked Sendable {
 
         captureQueue.async { [weak self] in
             guard let self,
-                  let connection = self.movieOutput.connection(with: .video),
+                  let connection = self.videoOutput.connection(with: .video),
                   connection.isVideoRotationAngleSupported(capture) else { return }
             connection.videoRotationAngle = capture
         }
@@ -585,7 +608,7 @@ final class CameraController: NSObject, @unchecked Sendable {
                     self.session.commitConfiguration()
                     let actualHDR = device.activeColorSpace == .HLG_BT2020
 
-                    if let connection = self.movieOutput.connection(with: .video),
+                    if let connection = self.videoOutput.connection(with: .video),
                        connection.isVideoMirroringSupported {
                         connection.isVideoMirrored = false
                     }
@@ -607,127 +630,86 @@ final class CameraController: NSObject, @unchecked Sendable {
 
     // MARK: - 录制
 
-    /// 交给 MovieFileOutput 直接录。
-    ///
-    /// 编码器、码率、HDR、像素格式、方向全由系统管线决定——不设 outputSettings，
-    /// 就是让系统按设备当前格式用它的默认策略，和系统相机同一套。
+    /// 只登记目标文件，真正的录制器等首帧到达、拿到旋转后的真实尺寸再建。
+    /// 写死尺寸会让横竖切换后的画面被拉伸。
     func startRecording() async throws {
         guard isConfigured else { throw CaptureError.cannotConfigure }
-
-        // 把音频从分流用的 AudioDataOutput 交给录制管线
-        session.beginConfiguration()
-        if session.outputs.contains(audioOutput) {
-            session.removeOutput(audioOutput)
-        }
-        if !session.outputs.contains(movieOutput), session.canAddOutput(movieOutput) {
-            session.addOutput(movieOutput)
-        }
-        if let connection = movieOutput.connection(with: .video),
-           connection.isVideoMirroringSupported {
-            connection.isVideoMirrored = false
-        }
-        session.commitConfiguration()
-
-        guard let connection = movieOutput.connection(with: .video) else {
-            restoreAudioOutput()
+        guard videoOutput.connection(with: .video) != nil else {
             throw CaptureError.cannotConfigure
         }
 
-        // 刚加进 session 的连接角度是默认 0，必须立刻按当前方向写进去。
-        // 这里不能用 applyRotationForCurrentInterface：它内部走 captureQueue.async，
-        // 而下一行就 startRecording，角度还没落地就已经开录，横屏会失效。
-        let angle = Self.captureAngle(for: lastInterfaceOrientation)
-        let supported = [angle, (angle + 180).truncatingRemainder(dividingBy: 360)]
-            .first { connection.isVideoRotationAngleSupported($0) }
-        if let supported {
-            connection.videoRotationAngle = supported
-            log.info(
-                "录制角度：写入 \(supported, privacy: .public)（目标 \(angle, privacy: .public)，界面 \(self.lastInterfaceOrientation.rawValue, privacy: .public)）"
-            )
-        } else {
-            log.error(
-                "录制角度：\(angle, privacy: .public) 与 180 度偏移都不被支持，保持连接默认值"
-            )
-        }
+        // 连接是复用的，这里按当前界面方向重设一次，保证切横屏后立刻生效
+        applyRotationForCurrentInterface()
 
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent("cueglide-\(Int(Date().timeIntervalSince1970)).mov")
-        movieOutput.startRecording(to: url, recordingDelegate: self)
+        pendingRecordingURL = url
         log.info("开始录制")
     }
 
-    /// 录完把音频输出换回分流模式，跟读才能继续用。
-    private func restoreAudioOutput() {
-        session.beginConfiguration()
-        if session.outputs.contains(movieOutput) {
-            session.removeOutput(movieOutput)
-        }
-        if !session.outputs.contains(audioOutput), session.canAddOutput(audioOutput) {
-            audioOutput.setSampleBufferDelegate(self, queue: captureQueue)
-            session.addOutput(audioOutput)
-        }
-        session.commitConfiguration()
-        log.info("音频输出已交还给跟读分流")
-    }
-
     func stopRecording() async -> URL? {
-        log.info("停止录制请求，isRecording=\(self.movieOutput.isRecording, privacy: .public)")
-        guard movieOutput.isRecording else { return nil }
-
-        return await withCheckedContinuation { (continuation: CheckedContinuation<URL?, Never>) in
-            recordingContinuation = continuation
-            movieOutput.stopRecording()
+        await withCheckedContinuation { (continuation: CheckedContinuation<URL?, Never>) in
+            captureQueue.async { [weak self] in
+                guard let self, let current = self.recorder else {
+                    continuation.resume(returning: nil)
+                    return
+                }
+                self.recorder = nil
+                Task {
+                    let url = await current.finish()
+                    continuation.resume(returning: url)
+                }
+            }
         }
     }
 }
 
-// MARK: - 录制回调
+// MARK: - 采样回调
 
-extension CameraController: AVCaptureFileOutputRecordingDelegate {
-
-    func fileOutput(
-        _ output: AVCaptureFileOutput,
-        didFinishRecordingTo outputFileURL: URL,
-        from connections: [AVCaptureConnection],
-        error: Error?
-    ) {
-        let continuation = recordingContinuation
-        recordingContinuation = nil
-
-        if let error {
-            log.error("录制失败：\(error.localizedDescription, privacy: .public)")
-            continuation?.resume(returning: nil)
-            return
-        }
-
-        log.info("录制完成：\(outputFileURL.lastPathComponent, privacy: .public)")
-        continuation?.resume(returning: outputFileURL)
-
-        // 录制结束把音频输出还给跟读分流
-        let queue = captureQueue
-        queue.async { [weak self] in
-            self?.restoreAudioOutput()
-        }
-
-        // 录制期间角度被锁住，结束后补一次，否则设备在录制中转过之后预览会停在旧角度
-        let position = position
-        DispatchQueue.main.async { [weak self] in
-            self?.rebuildRotationCoordinator(for: Self.device(for: position))
-        }
-    }
-}
-
-// MARK: - 音频分流
-
-extension CameraController: AVCaptureAudioDataOutputSampleBufferDelegate {
+extension CameraController: AVCaptureVideoDataOutputSampleBufferDelegate,
+                           AVCaptureAudioDataOutputSampleBufferDelegate {
 
     func captureOutput(
         _ output: AVCaptureOutput,
         didOutput sampleBuffer: CMSampleBuffer,
         from connection: AVCaptureConnection
     ) {
-        // 视频由 MovieFileOutput 自己录，这里只处理音频（分流给语音跟读）
-        guard output === audioOutput else { return }
-        onAudioSample?(sampleBuffer)
+        if output === videoOutput {
+            beginRecorderIfNeeded(with: sampleBuffer)
+            recorder?.appendVideo(sampleBuffer)
+        } else if output === audioOutput {
+            // 同一路音频同时进录制器和跟读分流——这是 DataOutput 相比
+            // MovieFileOutput 的关键好处：录制中也能跟读。
+            recorder?.appendAudio(sampleBuffer)
+            onAudioSample?(sampleBuffer)
+        }
+    }
+}
+
+// MARK: - 首帧建录制器
+
+extension CameraController {
+
+    private func beginRecorderIfNeeded(with sampleBuffer: CMSampleBuffer) {
+        guard recorder == nil,
+              let url = pendingRecordingURL,
+              let format = CMSampleBufferGetFormatDescription(sampleBuffer) else { return }
+
+        let dimensions = CMVideoFormatDescriptionGetDimensions(format)
+        guard dimensions.width > 0, dimensions.height > 0 else { return }
+
+        pendingRecordingURL = nil
+        let size = CGSize(width: CGFloat(dimensions.width), height: CGFloat(dimensions.height))
+        do {
+            let newRecorder = try VideoRecorder(url: url, size: size)
+            recorder = newRecorder
+            newRecorder.start()
+            log.info(
+                "录制尺寸：\(Int(size.width), privacy: .public)×\(Int(size.height), privacy: .public)"
+            )
+        } catch {
+            try? FileManager.default.removeItem(at: url)
+            log.error("录制器创建失败：\(error.localizedDescription, privacy: .public)")
+        }
     }
 }

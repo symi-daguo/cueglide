@@ -31,6 +31,7 @@
 		6FA3EB515783AF5C6C50854F /* CaptureView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6FC296C6FABC4B668D086983 /* CaptureView.swift */; };
 		73E77E152647E416E3A3C2C4 /* PrompterViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50EC4C55AF543131DEFA5EC3 /* PrompterViewModel.swift */; };
 		7804DC4905893DC9DCF3F777 /* FloatingFrameRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88CB044AD3908283267B655C /* FloatingFrameRenderer.swift */; };
+		7F1F779FEE9BF46AB5A74BE3 /* VideoRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A40FF3D8ED7D97089587D05 /* VideoRecorder.swift */; };
 		838BC729DF5FCE2DEAB1D42C /* ScriptListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3CF893D46050A8FCF154D637 /* ScriptListView.swift */; };
 		84A87A2BFDA8A4CD88F62A45 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30F7E6C6F3D48C5097BA9E01 /* Theme.swift */; };
 		8A8E566FD35C3B06D89DBD9E /* ScriptImporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46FE0EB6A998A83A57D0FA9F /* ScriptImporter.swift */; };
@@ -91,6 +92,7 @@
 		59F773FDE0F8B06072F7F6C1 /* MemoryProbe.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoryProbe.swift; sourceTree = "<group>"; };
 		63D99B344B868EFF78CA8297 /* CueGlideUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = CueGlideUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		68D85B27204428A9E22C05C7 /* ScriptAligner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScriptAligner.swift; sourceTree = "<group>"; };
+		6A40FF3D8ED7D97089587D05 /* VideoRecorder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoRecorder.swift; sourceTree = "<group>"; };
 		6D92415132CB7D9DF1828239 /* ScriptImporterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScriptImporterTests.swift; sourceTree = "<group>"; };
 		6FC296C6FABC4B668D086983 /* CaptureView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureView.swift; sourceTree = "<group>"; };
 		731E54652F46F1EB8B920B8F /* CameraController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraController.swift; sourceTree = "<group>"; };
@@ -235,6 +237,7 @@
 			children = (
 				89AE2DF62E054D1F1D6026E5 /* CameraAudioBridge.swift */,
 				731E54652F46F1EB8B920B8F /* CameraController.swift */,
+				6A40FF3D8ED7D97089587D05 /* VideoRecorder.swift */,
 			);
 			path = Capture;
 			sourceTree = "<group>";
@@ -520,6 +523,7 @@
 				0E9D884E462E38EE1FEE56E5 /* SpeechTracker.swift in Sources */,
 				6B98A81A7C65882EC9C1B3D0 /* TemplatesView.swift in Sources */,
 				84A87A2BFDA8A4CD88F62A45 /* Theme.swift in Sources */,
+				7F1F779FEE9BF46AB5A74BE3 /* VideoRecorder.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -608,7 +612,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 0.6.13;
+				MARKETING_VERSION = 0.6.14;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -677,7 +681,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 0.6.13;
+				MARKETING_VERSION = 0.6.14;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;

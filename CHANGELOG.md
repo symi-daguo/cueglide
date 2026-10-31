@@ -2,6 +2,21 @@
 
 本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)，格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)。
 
+## [0.6.14] - 2026-10-31
+
+录制改回 VideoDataOutput 管线，让「竖着拿也能拍横屏」真正可用。
+
+### 变更
+
+- **录制从 `AVCaptureMovieFileOutput` 改回 `AVCaptureVideoDataOutput` + `VideoRecorder`**：前者画质更好，但录制方向只跟设备物理方向，写 `videoRotationAngle` 对成片无效——实测写入 0 度后成片仍是 2160×3840，所以「点按钮切横屏」做不出来。改用 DataOutput 后方向由 connection 控制，真正能切
+- **编码参数不再手调**：`VideoRecorder` 只声明编码器与尺寸，不设码率、不设压缩属性，交给系统默认策略，避免早先手调码率把画质带偏
+- **横屏按钮恢复**（顶部右侧）：只改采集角度，不旋转界面，因此不会打断录制
+- **录制中也能跟读**：视频与音频各一个 DataOutput，同一路音频同时进录制器和跟读分流（MovieFileOutput 独占音频，做不到）
+
+### 说明
+
+- 本次改动未完成真机验证：设备重连后日志采集失效，自动录制也没产出新文件。横屏效果与画质需要真机确认
+
 ## [0.6.13] - 2026-10-31
 
 恢复 16:9 标准画面比例，移除不生效的强制横屏按钮。

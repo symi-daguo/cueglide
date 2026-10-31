@@ -47,7 +47,6 @@ struct CaptureView: View {
                 #if DEBUG
                 if ProcessInfo.processInfo.arguments.contains("-forceLandscape") {
                     forcedOrientation = .landscapeRight
-                    Self.requestOrientation(.landscapeRight)
                 }
                 #endif
                 prompter.configureVoice(localeIdentifier: "")
@@ -123,6 +122,20 @@ struct CaptureView: View {
                     .frame(height: 34)
                     .background(.black.opacity(0.45), in: .capsule)
                 }
+
+                // 横竖切换：只改采集方向，不转界面。
+                // VideoDataOutput 认 connection 的 videoRotationAngle，
+                // 所以这里能真正切换成横屏构图（MovieFileOutput 做不到）。
+                Button {
+                    forcedOrientation = forcedOrientation == nil ? .landscapeRight : nil
+                } label: {
+                    Image(systemName: forcedOrientation == nil ? "rectangle.portrait" : "rectangle")
+                        .font(.system(size: 15, weight: .semibold))
+                        .frame(width: 44, height: 44)
+                }
+                .buttonStyle(.plain)
+                .glassEffect(.regular, in: .circle)
+                .accessibilityLabel(forcedOrientation == nil ? "切换为横屏拍摄" : "切换为竖屏拍摄")
 
                 if !viewModel.isAvailable {
                     HStack(spacing: 5) {
