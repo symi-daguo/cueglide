@@ -54,9 +54,12 @@ final class CameraController: NSObject, @unchecked Sendable {
 
     /// 预览层由 UI 持有生命周期，这里只弱引用。
     private weak var previewLayer: AVCaptureVideoPreviewLayer?
-    /// 必须强引用：coordinator 释放后 KVO 就不再送角度了。
+    /// 必须强引用，重建时才拿得到角度。
     private var rotationCoordinator: AVCaptureDevice.RotationCoordinator?
-    private var rotationObservation: NSKeyValueObservation?
+    /// 当前界面方向。重建 coordinator 后要按它把角度补回去。
+    private var lastInterfaceOrientation: UIInterfaceOrientation = .portrait
+    /// 是否跑在 HDR（10-bit HLG）上。只有在格式支持且色彩空间切换真的生效时才为 true。
+    private var _isHDREnabled = false
 
     /// 用锁保护跨队列读写的少量标量，录制写入器本身只在 captureQueue 上被操作。
     private let stateLock = NSLock()
@@ -76,6 +79,13 @@ final class CameraController: NSObject, @unchecked Sendable {
         stateLock.lock()
         defer { stateLock.unlock() }
         return _isConfigured
+    }
+
+    /// 成片是否走 HDR。系统相机默认录 10-bit HLG，这是观感差距最大的地方。
+    var isHDREnabled: Bool {
+        stateLock.lock()
+        defer { stateLock.unlock() }
+        return _isHDREnabled
     }
 
     var isRecording: Bool {
@@ -160,7 +170,7 @@ final class CameraController: NSObject, @unchecked Sendable {
         }
 
         // 先定格式再装 input，否则 input 会按设备默认格式接线
-        try configureDevice(device)
+        let hdrEnabled = try configureDevice(device)
 
         let deviceInput = try AVCaptureDeviceInput(device: device)
         guard session.canAddInput(deviceInput) else { throw CaptureError.cannotConfigure }
@@ -176,11 +186,12 @@ final class CameraController: NSObject, @unchecked Sendable {
         }
 
         if session.outputs.isEmpty {
-            // 录制走硬件编码器，420v 是采集管线和编码器都原生支持的格式。
-            // 用 32BGRA 每帧要多做一次色彩转换，4K 下直接吃掉帧率。
+            // HDR 必须走 10-bit，否则色深不够、高光会直接切掉。
+            // 非 HDR 用 420v：采集管线和编码器都原生支持，比 32BGRA 省一次色彩转换。
             videoOutput.videoSettings = [
-                kCVPixelBufferPixelFormatTypeKey as String:
-                    kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange
+                kCVPixelBufferPixelFormatTypeKey as String: hdrEnabled
+                    ? kCVPixelFormatType_420YpCbCr10BiPlanarVideoRange
+                    : kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange
             ]
             videoOutput.alwaysDiscardsLateVideoFrames = true
             videoOutput.setSampleBufferDelegate(self, queue: captureQueue)
@@ -203,17 +214,24 @@ final class CameraController: NSObject, @unchecked Sendable {
         stateLock.lock()
         _position = device.position
         _isConfigured = true
+        _isHDREnabled = hdrEnabled
         stateLock.unlock()
 
         // 旋转不再写死 90 度，交给系统按设备姿态算
         rebuildRotationCoordinator(for: device)
+
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("-dumpCameraFormats") {
+            Self.dumpFormats(of: device)
+        }
+        #endif
 
         let dims = CMVideoFormatDescriptionGetDimensions(device.activeFormat.formatDescription)
         let fps = device.activeVideoMinFrameDuration.timescale > 0
             ? Int((Double(device.activeVideoMinFrameDuration.timescale) / Double(device.activeVideoMinFrameDuration.value)).rounded())
             : 0
         log.info(
-            "相机就绪：\(device.localizedName, privacy: .public) \(dims.width, privacy: .public)×\(dims.height, privacy: .public) @\(fps, privacy: .public)fps，格式数 \(device.formats.count, privacy: .public)"
+            "相机就绪：\(device.localizedName, privacy: .public) \(dims.width, privacy: .public)×\(dims.height, privacy: .public) @\(fps, privacy: .public)fps，\(hdrEnabled ? "HDR(HLG)" : "SDR", privacy: .public)，格式数 \(device.formats.count, privacy: .public)"
         )
     }
 
@@ -221,8 +239,10 @@ final class CameraController: NSObject, @unchecked Sendable {
     ///
     /// 前置相机在 iPhone 上是横向传感器，竖着拿靠旋转校正，所以这里只挑分辨率，
     /// 方向交给 `RotationCoordinator`。
-    private func configureDevice(_ device: AVCaptureDevice) throws {
-        guard let format = Self.bestVideoFormat(for: device) else { return }
+    /// 配置设备格式，返回 HDR 是否真的生效。
+    @discardableResult
+    private func configureDevice(_ device: AVCaptureDevice) throws -> Bool {
+        guard let format = Self.bestVideoFormat(for: device) else { return false }
 
         try device.lockForConfiguration()
         defer { device.unlockForConfiguration() }
@@ -237,6 +257,18 @@ final class CameraController: NSObject, @unchecked Sendable {
         let duration = CMTime(value: 1, timescale: CMTimeScale(target.rounded()))
         device.activeVideoMinFrameDuration = duration
         device.activeVideoMaxFrameDuration = duration
+
+        // HDR 走 HLG / BT.2020。只有格式本身支持、且设置后读回来确认生效才认，
+        // 任何一步不满足都退回 SDR——宁可没有 HDR，也不能出现偏色画面。
+        if format.isVideoHDRSupported, format.supportedColorSpaces.contains(.HLG_BT2020) {
+            device.activeColorSpace = .HLG_BT2020
+            let applied = device.activeColorSpace == .HLG_BT2020
+            if !applied {
+                log.error("HLG 色彩空间设置未生效，退回 SDR")
+            }
+            return applied
+        }
+        return false
     }
 
     private static func bestVideoFormat(for device: AVCaptureDevice) -> AVCaptureDevice.Format? {
@@ -291,21 +323,94 @@ final class CameraController: NSObject, @unchecked Sendable {
     }
 
     private func rebuildRotationCoordinator(for device: AVCaptureDevice?) {
-        rotationObservation = nil
         rotationCoordinator = nil
         guard let device else { return }
 
-        let coordinator = AVCaptureDevice.RotationCoordinator(device: device, previewLayer: previewLayer)
-        rotationCoordinator = coordinator
+        rotationCoordinator = AVCaptureDevice.RotationCoordinator(
+            device: device,
+            previewLayer: previewLayer
+        )
+        // coordinator 本身不主动送角度更新（不挂 KVO，见 updateRotation 的说明），
+        // 重建后按上次的界面方向把角度补回去。
+        applyRotationForCurrentInterface()
+    }
 
-        rotationObservation = coordinator.observe(
-            \.videoRotationAngleForHorizonLevelCapture,
-            options: [.initial, .new]
-        ) { [weak self] coordinator, _ in
-            self?.applyRotation(
-                preview: coordinator.videoRotationAngleForHorizonLevelPreview,
-                capture: coordinator.videoRotationAngleForHorizonLevelCapture
+    /// 按界面方向设定旋转角。
+    ///
+    /// 只跟重力（horizon-level）会有两个问题：设备平放或开了方向锁定时，重力角度
+    /// 和界面方向对不上，表现就是「界面横了、录出来还是竖的」。iOS 27 的
+    /// `videoRotationAngleRelativeToDeviceOrientation` 直接按给定界面方向返回角度，
+    /// 不受重力影响；低于 27 退回重力角度。
+    func updateRotation(interfaceOrientation: UIInterfaceOrientation) {
+        lastInterfaceOrientation = interfaceOrientation
+        applyRotationForCurrentInterface()
+    }
+
+    private func applyRotationForCurrentInterface() {
+        guard !isRecording, let coordinator = rotationCoordinator else { return }
+
+        let angle: CGFloat
+        if #available(iOS 27, *) {
+            angle = coordinator.videoRotationAngleRelative(
+                toDeviceOrientation: Self.videoOrientation(for: lastInterfaceOrientation)
             )
+        } else {
+            angle = coordinator.videoRotationAngleForHorizonLevelCapture
+        }
+        applyRotation(preview: angle, capture: angle)
+    }
+
+    #if DEBUG
+    /// 把设备支持的全部格式打到日志，用于核对原生能力。
+    ///
+    /// 前置相机的可用格式在不同机型上差别很大（4:3 / 16:9、8-bit / 10-bit HDR、
+    /// 最高帧率都不同），靠猜会选错档，所以直接把真实列表打出来看。
+    private static func dumpFormats(of device: AVCaptureDevice) {
+        let probe = Logger(subsystem: "com.symi.cueglide", category: "CameraFormats")
+        probe.info("===== \(device.localizedName, privacy: .public) 共 \(device.formats.count, privacy: .public) 个格式 =====")
+
+        for (index, format) in device.formats.enumerated() {
+            let dims = CMVideoFormatDescriptionGetDimensions(format.formatDescription)
+            let subtype = CMFormatDescriptionGetMediaSubType(format.formatDescription)
+            let rates = format.videoSupportedFrameRateRanges
+                .map { String(format: "%.0f-%.0f", $0.minFrameRate, $0.maxFrameRate) }
+                .joined(separator: "/")
+            let spaces = format.supportedColorSpaces
+                .map { String(describing: $0) }
+                .joined(separator: ",")
+            let hdr = format.isVideoHDRSupported ? "HDR" : "SDR"
+
+            probe.info(
+                "#\(index, privacy: .public) \(dims.width, privacy: .public)x\(dims.height, privacy: .public) @\(rates, privacy: .public) 像素[\(subtype, privacy: .public)] \(hdr, privacy: .public) 色彩[\(spaces, privacy: .public)]"
+            )
+        }
+
+        let active = device.activeFormat
+        let activeDims = CMVideoFormatDescriptionGetDimensions(active.formatDescription)
+        probe.info(
+            "当前 activeFormat：\(activeDims.width, privacy: .public)x\(activeDims.height, privacy: .public)，activeColorSpace=\(device.activeColorSpace.rawValue, privacy: .public)，HDR=\(active.isVideoHDRSupported, privacy: .public)"
+        )
+        probe.info(
+            "设备能力：HDR=\(device.activeFormat.isVideoHDRSupported, privacy: .public)，最大变焦=\(device.maxAvailableVideoZoomFactor, privacy: .public)"
+        )
+    }
+    #endif
+
+    private static func videoOrientation(
+        for orientation: UIInterfaceOrientation
+    ) -> AVCaptureVideoOrientation {
+        switch orientation {
+        case .portrait:
+            return .portrait
+        case .portraitUpsideDown:
+            return .portraitUpsideDown
+        case .landscapeLeft:
+            return .landscapeLeft
+        case .landscapeRight:
+            return .landscapeRight
+        default:
+            // UIInterfaceOrientation 是非冻结枚举，未知值按竖屏处理
+            return .portrait
         }
     }
 
@@ -377,6 +482,11 @@ final class CameraController: NSObject, @unchecked Sendable {
                     if let old = self.videoInput {
                         self.session.removeInput(old)
                     }
+
+                    // 换镜头后必须重新选格式：新设备的 activeFormat 是它自己的默认值，
+                    // 不重选就会退回低分辨率（之前切到后摄画质掉一档就是这个原因）。
+                    let hdr = (try? self.configureDevice(device)) ?? false
+
                     guard self.session.canAddInput(newInput) else {
                         if let old = self.videoInput, self.session.canAddInput(old) {
                             self.session.addInput(old)
@@ -386,6 +496,13 @@ final class CameraController: NSObject, @unchecked Sendable {
                     }
                     self.session.addInput(newInput)
                     self.videoInput = newInput
+
+                    self.videoOutput.videoSettings = [
+                        kCVPixelBufferPixelFormatTypeKey as String: hdr
+                            ? kCVPixelFormatType_420YpCbCr10BiPlanarVideoRange
+                            : kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange
+                    ]
+
                     self.session.commitConfiguration()
 
                     if let connection = self.videoOutput.connection(with: .video) {
@@ -396,6 +513,7 @@ final class CameraController: NSObject, @unchecked Sendable {
 
                     self.stateLock.lock()
                     self._position = device.position
+                    self._isHDREnabled = hdr
                     self.stateLock.unlock()
 
                     // 换了镜头，原生方向可能不同，必须重建
@@ -482,7 +600,11 @@ extension CameraController {
         pendingRecordingURL = nil
         let size = CGSize(width: CGFloat(dimensions.width), height: CGFloat(dimensions.height))
         do {
-            let newWriter = try RecordingWriter(outputURL: url, videoSize: size)
+            let newWriter = try RecordingWriter(
+                outputURL: url,
+                videoSize: size,
+                isHDR: isHDREnabled
+            )
             writer = newWriter
             newWriter.start()
             log.info("录制开始：\(newWriter.summary, privacy: .public)")
@@ -504,12 +626,14 @@ final class RecordingWriter {
     private let outputURL: URL
     private let videoSize: CGSize
     private let codec: AVVideoCodecType
+    private let isHDR: Bool
     private var started = false
     private var sessionStarted = false
 
-    init(outputURL: URL, videoSize: CGSize) throws {
+    init(outputURL: URL, videoSize: CGSize, isHDR: Bool = false) throws {
         self.outputURL = outputURL
         self.videoSize = videoSize
+        self.isHDR = isHDR
         try? FileManager.default.removeItem(at: outputURL)
 
         let assetWriter = try AVAssetWriter(outputURL: outputURL, fileType: .mov)
@@ -517,11 +641,11 @@ final class RecordingWriter {
 
         // HEVC 同画质码率约为 H.264 的一半，iPhone 全系有硬件编码；
         // 万一当前尺寸不支持再退回 H.264。
-        let hevcSettings = Self.videoSettings(size: videoSize, codec: .hevc)
+        let hevcSettings = Self.videoSettings(size: videoSize, codec: .hevc, isHDR: isHDR)
         let chosen: AVVideoCodecType =
             assetWriter.canApply(outputSettings: hevcSettings, forMediaType: .video) ? .hevc : .h264
         self.codec = chosen
-        let videoSettings = Self.videoSettings(size: videoSize, codec: chosen)
+        let videoSettings = Self.videoSettings(size: videoSize, codec: chosen, isHDR: isHDR)
 
         videoInput = AVAssetWriterInput(mediaType: .video, outputSettings: videoSettings)
         videoInput.expectsMediaDataInRealTime = true
@@ -544,10 +668,14 @@ final class RecordingWriter {
     /// 按像素折算码率。之前不设码率，系统给的默认值在 1080p 以上明显偏紧，
     /// 4K 会糊成一片。系数按系统相机的实测水平取：HEVC 0.18 bit/像素/帧
     /// 对应 4K30 约 45Mbps，H.264 需要 0.26 才追得平。
-    static func videoSettings(size: CGSize, codec: AVVideoCodecType) -> [String: Any] {
-        let bitRate = Self.averageBitRate(for: size, codec: codec)
+    static func videoSettings(
+        size: CGSize,
+        codec: AVVideoCodecType,
+        isHDR: Bool = false
+    ) -> [String: Any] {
+        let bitRate = Self.averageBitRate(for: size, codec: codec, isHDR: isHDR)
 
-        return [
+        var settings: [String: Any] = [
             AVVideoCodecKey: codec,
             AVVideoWidthKey: Int(size.width),
             AVVideoHeightKey: Int(size.height),
@@ -557,20 +685,46 @@ final class RecordingWriter {
                 AVVideoMaxKeyFrameIntervalKey: 30
             ]
         ]
+
+        // HDR 必须声明色彩三要素，否则播放器会按 SDR 解释，画面发灰发暗。
+        if isHDR {
+            settings[AVVideoColorPropertiesKey] = [
+                AVVideoColorPrimariesKey: AVVideoColorPrimaries_ITU_R_2020,
+                AVVideoTransferFunctionKey: AVVideoTransferFunction_ITU_R_2100_HLG,
+                AVVideoYCbCrMatrixKey: AVVideoYCbCrMatrix_ITU_R_2020
+            ]
+        }
+        return settings
     }
 
-    /// 码率按像素折算：0.18 bit/像素/帧对应 4K30 约 45Mbps，接近系统相机水平。
-    /// 低于 8Mbps 时画面会明显发糊，设个下限兜住小尺寸。
-    static func averageBitRate(for size: CGSize, codec: AVVideoCodecType) -> Int {
+    /// 码率按像素折算。
+    ///
+    /// HEVC 取 0.22 bit/像素/帧，4K30 约 55Mbps——系统相机 4K30 HEVC 实测在
+    /// 50–60Mbps，低于这个数运动画面会出现可见的块状压缩。H.264 效率低，
+    /// 同画质要 0.30。低于 8Mbps 时画面会明显发糊，设个下限兜住小尺寸。
+    static func averageBitRate(
+        for size: CGSize,
+        codec: AVVideoCodecType,
+        isHDR: Bool = false
+    ) -> Int {
         let pixels = Double(size.width) * Double(size.height)
-        let bitsPerPixel = codec == .hevc ? 0.18 : 0.26
+
+        // 10-bit 数据量是 8-bit 的 1.5 倍，码率要跟着提，否则高光过渡会出色带。
+        let bitsPerPixel: Double
+        switch (codec, isHDR) {
+        case (.hevc, true): bitsPerPixel = 0.26
+        case (.hevc, false): bitsPerPixel = 0.22
+        case (_, true): bitsPerPixel = 0.34
+        default: bitsPerPixel = 0.30
+        }
         return max(8_000_000, Int(pixels * 30 * bitsPerPixel))
     }
 
     /// 成片里记录的编码器与分辨率，用于界面提示与排查。
     var summary: String {
         let dims = "\(Int(videoSize.width))×\(Int(videoSize.height))"
-        return "\(dims) \(codec == .hevc ? "HEVC" : "H.264")"
+        let codecName = codec == .hevc ? "HEVC" : "H.264"
+        return isHDR ? "\(dims) \(codecName) HDR" : "\(dims) \(codecName)"
     }
 
     func start() {

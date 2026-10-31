@@ -190,6 +190,12 @@ final class PrompterViewModel {
         }
     }
 
+    /// 界面上的速度加减。上一步 / 下一步都按 10% 走，四种模式下体感一致。
+    func stepSpeed(_ direction: Int) {
+        guard direction != 0 else { return }
+        adjustSpeed(factor: direction > 0 ? 1.1 : 1 / 1.1)
+    }
+
     /// 遥控调速按比例走，避免不同模式下步长不一致。
     private func adjustSpeed(factor: Double) {
         var next = scroll

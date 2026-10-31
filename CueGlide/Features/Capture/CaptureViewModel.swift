@@ -146,6 +146,16 @@ final class CaptureViewModel {
                 userInfo: [NSLocalizedDescriptionKey: "没有相册写入权限"]
             )
         }
+        try await Self.addVideoAsset(at: url)
+    }
+
+    /// 必须放在 `nonisolated` 里。
+    ///
+    /// `performChanges` 的闭包由 Photos 在后台事务队列
+    /// （com.apple.PHPhotoLibrary.transaction）执行，而它是在 `@MainActor` 类里
+    /// 定义的：非 Sendable 闭包会继承主执行器隔离，一进闭包就断言失败、SIGTRAP。
+    /// 表现就是录制完点停止，保存时闪退。
+    private nonisolated static func addVideoAsset(at url: URL) async throws {
         try await PHPhotoLibrary.shared().performChanges {
             PHAssetChangeRequest.creationRequestForAssetFromVideo(atFileURL: url)
         }

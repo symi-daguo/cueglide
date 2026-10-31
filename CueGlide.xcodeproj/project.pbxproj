@@ -47,6 +47,7 @@
 		EB074F299DA570B992B5A844 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = E48E6D08A29CA59FFB33BD14 /* PrivacyInfo.xcprivacy */; };
 		EB1400D076F48FB39AF6D4CF /* SpeechAudioCaptureTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4B9ABC6E3759E73E99FE4429 /* SpeechAudioCaptureTests.swift */; };
 		F45C497EF1AFE9EC528054AC /* CaptureViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3686F66FDED6869CCFC5C135 /* CaptureViewModel.swift */; };
+		F47ED85D97E9A7A61B3561C9 /* MemoryProbe.swift in Sources */ = {isa = PBXBuildFile; fileRef = 59F773FDE0F8B06072F7F6C1 /* MemoryProbe.swift */; };
 		FC735D38FA0247D2D905F416 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73F5E74F2513BB525C84E4DB /* HomeView.swift */; };
 /* End PBXBuildFile section */
 
@@ -86,6 +87,7 @@
 		50F9E74D662847DB6F95A07A /* ScrollEngineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScrollEngineTests.swift; sourceTree = "<group>"; };
 		52D73D4563133D6A8C364707 /* ScriptAlignerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScriptAlignerTests.swift; sourceTree = "<group>"; };
 		52E149ABE9791095B162570A /* RemoteController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteController.swift; sourceTree = "<group>"; };
+		59F773FDE0F8B06072F7F6C1 /* MemoryProbe.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoryProbe.swift; sourceTree = "<group>"; };
 		63D99B344B868EFF78CA8297 /* CueGlideUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = CueGlideUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		68D85B27204428A9E22C05C7 /* ScriptAligner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScriptAligner.swift; sourceTree = "<group>"; };
 		6D92415132CB7D9DF1828239 /* ScriptImporterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScriptImporterTests.swift; sourceTree = "<group>"; };
@@ -247,10 +249,19 @@
 			path = CueGlideTests;
 			sourceTree = "<group>";
 		};
+		A72BF7B98D5E02F1B91345FD /* Diagnostics */ = {
+			isa = PBXGroup;
+			children = (
+				59F773FDE0F8B06072F7F6C1 /* MemoryProbe.swift */,
+			);
+			path = Diagnostics;
+			sourceTree = "<group>";
+		};
 		B59760D3A4797AE3BC6AA0CE /* Core */ = {
 			isa = PBXGroup;
 			children = (
 				7867BFE5B76CF92CAFBDB165 /* Capture */,
+				A72BF7B98D5E02F1B91345FD /* Diagnostics */,
 				6A67A778EF5834041253EE4B /* PiP */,
 				26826431B3663A0CFDCEAA11 /* PromptEngine */,
 				F6779576E919DA09CFBC84F7 /* Remote */,
@@ -483,6 +494,7 @@
 				4046E2CA8CB23EBE0267B751 /* FloatingPrompterView.swift in Sources */,
 				5F09E76B887D10585E6BEA68 /* Format.swift in Sources */,
 				FC735D38FA0247D2D905F416 /* HomeView.swift in Sources */,
+				F47ED85D97E9A7A61B3561C9 /* MemoryProbe.swift in Sources */,
 				B66A79195D3D70E0D4514E3B /* PageHeader.swift in Sources */,
 				3EF14F0C9266BF24CBE8B7CB /* PromptConfig.swift in Sources */,
 				467B6C589996B1039D014033 /* PrompterRenderer.swift in Sources */,
@@ -592,7 +604,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 0.6.7;
+				MARKETING_VERSION = 0.6.8;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -661,7 +673,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 0.6.7;
+				MARKETING_VERSION = 0.6.8;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;

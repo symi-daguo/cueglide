@@ -62,8 +62,8 @@ final class CameraFormatTests: XCTestCase {
             for: CGSize(width: 3840, height: 2160),
             codec: .hevc
         )
-        XCTAssertGreaterThan(rate, 43_000_000, "4K HEVC 码率偏低会发糊")
-        XCTAssertLessThan(rate, 47_000_000)
+        XCTAssertGreaterThan(rate, 52_000_000, "4K HEVC 码率偏低会发糊")
+        XCTAssertLessThan(rate, 58_000_000)
     }
 
     /// 同尺寸下 HEVC 必须比 H.264 省，否则选 HEVC 没有意义。
@@ -90,6 +90,38 @@ final class CameraFormatTests: XCTestCase {
             codec: .h264
         )
         XCTAssertEqual(rate, 8_000_000)
+    }
+
+    /// HDR 必须声明色彩三要素，否则播放器按 SDR 解释，画面发灰。
+    func testHDRDeclaresColorProperties() {
+        let settings = RecordingWriter.videoSettings(
+            size: CGSize(width: 3840, height: 2160),
+            codec: .hevc,
+            isHDR: true
+        )
+        let color = settings[AVVideoColorPropertiesKey] as? [String: String]
+        XCTAssertNotNil(color, "HDR 缺少色彩声明会被当 SDR 播")
+        XCTAssertEqual(color?[AVVideoColorPrimariesKey], AVVideoColorPrimaries_ITU_R_2020)
+        XCTAssertEqual(color?[AVVideoTransferFunctionKey], AVVideoTransferFunction_ITU_R_2100_HLG)
+        XCTAssertEqual(color?[AVVideoYCbCrMatrixKey], AVVideoYCbCrMatrix_ITU_R_2020)
+    }
+
+    /// SDR 不应带 HLG 声明，否则播放器会错判色域。
+    func testSDRHasNoHDRColorProperties() {
+        let settings = RecordingWriter.videoSettings(
+            size: CGSize(width: 1920, height: 1080),
+            codec: .hevc
+        )
+        XCTAssertNil(settings[AVVideoColorPropertiesKey])
+    }
+
+    /// 10-bit 数据量更大，HDR 码率必须高于同尺寸 SDR。
+    func testHDRBitRateExceedsSDR() {
+        let size = CGSize(width: 3840, height: 2160)
+        let hdr = RecordingWriter.averageBitRate(for: size, codec: .hevc, isHDR: true)
+        let sdr = RecordingWriter.averageBitRate(for: size, codec: .hevc, isHDR: false)
+        XCTAssertGreaterThan(hdr, sdr)
+        XCTAssertGreaterThan(hdr, 55_000_000, "4K HDR 低于 55Mbps 会在高光过渡处出现色带")
     }
 
     /// 输出设置必须带上压缩属性，否则系统会用默认码率（也就是之前糊的原因）。

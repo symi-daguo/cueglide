@@ -29,6 +29,9 @@ struct RootView: View {
             cleanStoreIfRequested()
             seedSampleIfNeeded()
             handleLaunchArguments()
+            #if DEBUG
+            MemoryProbe.startIfRequested()
+            #endif
         }
         .fullScreenCover(item: $deepLinkScript) { script in
             PrompterView(

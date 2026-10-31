@@ -138,7 +138,7 @@ CueGlide/
     Capture/        提词拍摄
     Templates/      模板库
     Settings/       设置
-CueGlideTests/        单元测试（54 个用例）
+CueGlideTests/        单元测试（57 个用例）
 CueGlideUITests/      横竖屏截图测试
 docs/
   设计说明.md        产品边界、界面规格、核心算法、技术选型
