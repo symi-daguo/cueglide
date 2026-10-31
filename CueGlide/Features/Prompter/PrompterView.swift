@@ -65,7 +65,12 @@ struct PrompterView: View {
                     viewModel.togglePlayback()
                 }
                 if autoStartVoice || ProcessInfo.processInfo.arguments.contains("-autoVoice") {
-                    viewModel.toggleVoice()
+                    // 不能在 onAppear 同步调用：此时视图还在首帧布局，tracker 的
+                    // start 会被随后的重建打断，表现就是「进来不是跟读模式，得再点一次」。
+                    Task {
+                        try? await Task.sleep(for: .milliseconds(600))
+                        viewModel.startVoice()
+                    }
                 }
                 if ProcessInfo.processInfo.arguments.contains("-adjustFont") {
                     viewModel.adjustTarget = .fontSize
