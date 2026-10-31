@@ -2,6 +2,24 @@
 
 本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)，格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)。
 
+## [0.6.19] - 2026-10-31
+
+跟读默认开启，对齐窗口缩短让跟手更快。
+
+### 变更
+
+- **进入提词页即进入跟随模式**：`PrompterView` 的 `autoStartVoice` 默认改为 true，各入口不再分别判断
+- **对齐窗口 12 字缩到 8 字**：旧值要求连续说满 12 个字才匹配得上，观感就是「慢一个节拍、然后一下跳到说完的位置」。中文 8 个字配合 ±10 词局部窗口已足够定位
+
+### 新增测试
+
+- `testAlignsWithShortUtterance`：说 4 个字就要能定位
+- `testAdvancesMonotonicallyAsSpeechGrows`：说话变长时命中位置必须单调前进，不能跳到句尾
+
+### 说明
+
+- 识别端未改动。用 TTS 合成音验证 `SpeechAnalyzer` 时只识别出一个「哦」，但真机真人声此前是有结果的，所以本轮只调整对齐与默认行为，不动识别链路
+
 ## [0.6.18] - 2026-10-31
 
 跟读的延迟与准确性大幅改善。

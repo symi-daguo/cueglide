@@ -71,11 +71,11 @@ struct HomeView: View {
                 }
             }
             .fullScreenCover(item: $request) { request in
+                // 统一走默认：进入提词页即跟随，不再区分入口
                 PrompterView(
                     script: request.script,
                     display: settings.display,
-                    scroll: settings.scroll,
-                    autoStartVoice: request.startVoice
+                    scroll: settings.scroll
                 )
             }
         }

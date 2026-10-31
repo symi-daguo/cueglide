@@ -28,6 +28,36 @@ final class ScriptAlignerTests: XCTestCase {
         XCTAssertTrue(match2.tokenIndex < tokenized.totalTokens)
     }
 
+    /// 响应性：只说三四个字就应该能定位，不必等说满一整句。
+    ///
+    /// 旧实现要求尾部 12 个字参与匹配，用户感知就是「慢一个节拍、然后一下跳到
+    /// 说完的位置」。这里锁住「短句也能命中」这个行为。
+    func testAlignsWithShortUtterance() {
+        let (aligner, _) = make("现在你看到的就是提词页文字会按照设定的速度向上滚动正在读的那一句会被高亮")
+        let match = aligner.align(spoken: "现在你看", currentToken: 0)
+        XCTAssertNotNil(match, "说四个字就应该能定位")
+        XCTAssertLessThanOrEqual(match!.tokenIndex, 4, "命中位置应在开头几个词内")
+    }
+
+    /// 逐字推进：随着说的话变长，命中位置必须单调前进，
+    /// 不能出现「一直不动、然后一下跳到句尾」的观感。
+    func testAdvancesMonotonicallyAsSpeechGrows() {
+        let sentence = "现在你看到的就是提词页文字会按照设定的速度向上滚动"
+        let (aligner, _) = make(sentence)
+
+        var positions: [Int] = []
+        for length in [4, 6, 8, 10, 12] {
+            let spoken = String(sentence.prefix(length))
+            if let match = aligner.align(spoken: spoken, currentToken: 0) {
+                positions.append(match.tokenIndex)
+            }
+        }
+
+        XCTAssertGreaterThanOrEqual(positions.count, 3, "多数长度都应能命中")
+        XCTAssertEqual(positions, positions.sorted(), "命中位置必须单调不减")
+        XCTAssertLessThan(positions.last ?? 99, 20, "说 12 个字不应直接跳到很远的位置")
+    }
+
     /// 跳段找回：稿子长度超过局部窗口，从开头跳到最后一段，必须走全稿搜索。
     func testJumpForwardFound() {
         let body = longBody

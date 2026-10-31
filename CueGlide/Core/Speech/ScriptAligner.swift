@@ -25,8 +25,12 @@ struct ScriptAligner {
     private let tokenStartCharacter: [Int]
     private let tokenCount: Int
 
-    /// 参与比对的尾部字符数。太短容易误命中，太长则对漏字更敏感。
-    private let queryLength = 12
+    /// 参与比对的尾部字符数。
+    ///
+    /// 这个值直接决定跟手的快慢：取 12 时要求连续说满 12 个字才匹配得上，
+    /// 用户感知就是「慢一个节拍、然后一下跳到说完的位置」。中文 6–8 个字
+    /// 已经足够定位（配合 ±10 词的局部窗口），取 8 兼顾响应与抗误配。
+    private let queryLength = 8
     /// 局部窗口向前看的词数。
     private let forwardWindow = 90
     /// 局部窗口向后看的词数。

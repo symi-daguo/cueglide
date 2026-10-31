@@ -12,7 +12,9 @@ struct PrompterView: View {
     @Environment(\.verticalSizeClass) private var verticalSizeClass
     private let autoStartVoice: Bool
 
-    init(script: Script, display: DisplayConfig, scroll: ScrollConfig, autoStartVoice: Bool = false) {
+    /// `autoStartVoice` 默认为 true：进入提词页即进入跟随模式，
+    /// 用户不需要再点一次跟读按钮。需要静默浏览时由调用方显式传 false。
+    init(script: Script, display: DisplayConfig, scroll: ScrollConfig, autoStartVoice: Bool = true) {
         _viewModel = State(initialValue: PrompterViewModel(script: script, display: display, scroll: scroll))
         self.autoStartVoice = autoStartVoice
     }

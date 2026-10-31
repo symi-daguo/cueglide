@@ -248,6 +248,12 @@ final class PrompterViewModel {
 
     var isVoiceActive: Bool { tracker.state.isActive }
 
+    /// 幂等开启跟读。用于进入提词页时默认进入跟随模式。
+    func startVoice() {
+        guard !tracker.state.isActive else { return }
+        toggleVoice()
+    }
+
     func toggleVoice() {
         guard allowsVoiceTracking else {
             voiceAlert = "录制中无法使用语音跟读。录制和跟读都要占用麦克风，只能二选一。"
