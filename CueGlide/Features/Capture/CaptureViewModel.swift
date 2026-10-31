@@ -60,6 +60,11 @@ final class CaptureViewModel {
             camera.start()
             phase = .ready
             #if DEBUG
+            if ProcessInfo.processInfo.arguments.contains("-autoVoice") {
+                try? await Task.sleep(for: .seconds(2))
+                toggleVoice()
+                try? await Task.sleep(for: .seconds(4))
+            }
             await runAutoRecordIfRequested()
             #endif
         } catch {

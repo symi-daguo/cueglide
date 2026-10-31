@@ -1,6 +1,13 @@
 import AVFoundation
-import Speech
 import os
+
+/// 跨隔离传递的音频帧。
+///
+/// `AVAudioPCMBuffer` 本身不是 Sendable，但这里的缓冲是刚由转换器新建、
+/// 投递后不再被采集队列改写，独占所有权，所以可以安全跨队列。
+struct AudioChunk: @unchecked Sendable {
+    let buffer: AVAudioPCMBuffer
+}
 
 /// 把相机采集的音频转成 `AnalyzerInput`，供 `SpeechAnalyzer` 实时识别。
 ///
@@ -21,13 +28,18 @@ final class CameraAudioBridge: @unchecked Sendable {
         self.targetFormat = targetFormat
     }
 
+    /// 采集队列上只做格式转换。
+    ///
+    /// `AnalyzerInput.init(buffer:)` 内部有执行器要求，在这里构造会直接
+    /// `_dispatch_assert_queue_fail` / SIGTRAP，所以只投递裸缓冲，
+    /// 由消费方在主线程包装。
     func handle(
         _ sampleBuffer: CMSampleBuffer,
-        continuation: AsyncStream<AnalyzerInput>.Continuation
+        continuation: AsyncStream<AudioChunk>.Continuation
     ) {
         guard let pcm = Self.pcmBuffer(from: sampleBuffer) else { return }
         let output = converted(pcm) ?? pcm
-        continuation.yield(AnalyzerInput(buffer: output))
+        continuation.yield(AudioChunk(buffer: output))
     }
 
     /// 相机给的是 44.1/48kHz，识别器通常要 16kHz，必须重采样。

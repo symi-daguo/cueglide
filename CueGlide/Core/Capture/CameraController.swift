@@ -480,7 +480,7 @@ final class CameraController: NSObject, @unchecked Sendable {
     func attachSpeechAudio(
         sampleRate: Double,
         channels: AVAudioChannelCount,
-        continuation: AsyncStream<AnalyzerInput>.Continuation
+        continuation: AsyncStream<AudioChunk>.Continuation
     ) {
         guard let target = AVAudioFormat(
             standardFormatWithSampleRate: sampleRate,
@@ -543,7 +543,7 @@ final class CameraController: NSObject, @unchecked Sendable {
 
                     // 换镜头后必须重新选格式：新设备的 activeFormat 是它自己的默认值，
                     // 不重选就会退回低分辨率（之前切到后摄画质掉一档就是这个原因）。
-                    try? self.configureDevice(device)
+                    _ = try? self.configureDevice(device)
 
                     guard self.session.canAddInput(newInput) else {
                         if let old = self.videoInput, self.session.canAddInput(old) {

@@ -9,6 +9,8 @@ struct CaptureView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(AppSettings.self) private var appSettings
     @Environment(\.verticalSizeClass) private var verticalSizeClass
+    /// 手动锁定的拍摄方向。为 nil 时跟随界面方向。
+    @State private var forcedOrientation: UIInterfaceOrientation?
 
     init(script: Script, display: DisplayConfig, scroll: ScrollConfig) {
         _viewModel = State(
@@ -27,8 +29,11 @@ struct CaptureView: View {
                 Color.black.ignoresSafeArea()
 
                 if viewModel.isAvailable {
-                    CameraPreview(controller: viewModel.camera)
-                        .ignoresSafeArea()
+                    CameraPreview(
+                        controller: viewModel.camera,
+                        forcedOrientation: forcedOrientation
+                    )
+                    .ignoresSafeArea()
                 } else {
                     Color.black.ignoresSafeArea()
                 }
@@ -112,6 +117,18 @@ struct CaptureView: View {
                     .frame(height: 34)
                     .background(.black.opacity(0.45), in: .capsule)
                 }
+
+                // 横竖切换：不点它时跟随界面方向，点一次锁到横屏，再点恢复
+                Button {
+                    forcedOrientation = forcedOrientation == nil ? .landscapeRight : nil
+                } label: {
+                    Image(systemName: forcedOrientation == nil ? "rectangle.portrait" : "rectangle")
+                        .font(.system(size: 15, weight: .semibold))
+                        .frame(width: 44, height: 44)
+                }
+                .buttonStyle(.plain)
+                .glassEffect(.regular, in: .circle)
+                .accessibilityLabel(forcedOrientation == nil ? "锁定横屏拍摄" : "恢复跟随界面方向")
 
                 if !viewModel.isAvailable {
                     HStack(spacing: 5) {
@@ -324,10 +341,12 @@ private struct PrompterHostViewRepresentable: UIViewRepresentable {
 
 private struct CameraPreview: UIViewRepresentable {
     let controller: CameraController
+    let forcedOrientation: UIInterfaceOrientation?
 
     func makeUIView(context: Context) -> PreviewContainer {
         let view = PreviewContainer()
         view.controller = controller
+        view.apply(forcedOrientation: forcedOrientation)
         view.previewLayer.session = controller.session
         view.previewLayer.videoGravity = .resizeAspectFill
         view.layer.addSublayer(view.previewLayer)
@@ -342,13 +361,22 @@ private struct CameraPreview: UIViewRepresentable {
             uiView.previewLayer.session = controller.session
             uiView.setNeedsLayout()
         }
+        uiView.apply(forcedOrientation: forcedOrientation)
     }
 }
 
 private final class PreviewContainer: UIView {
     let previewLayer = AVCaptureVideoPreviewLayer()
     weak var controller: CameraController?
-    private var lastOrientation: UIInterfaceOrientation?
+    private var forcedOrientation: UIInterfaceOrientation?
+    private var lastApplied: UIInterfaceOrientation?
+
+    /// 手动锁定方向。传 nil 恢复跟随界面。
+    func apply(forcedOrientation: UIInterfaceOrientation?) {
+        guard self.forcedOrientation != forcedOrientation else { return }
+        self.forcedOrientation = forcedOrientation
+        setNeedsLayout()
+    }
 
     override func layoutSubviews() {
         super.layoutSubviews()
@@ -357,13 +385,12 @@ private final class PreviewContainer: UIView {
         previewLayer.frame = bounds
         CATransaction.commit()
 
-        // 按界面方向定旋转角，而不是只跟重力：设备平放或开了方向锁定时，
-        // 重力角度会和界面对不上，表现就是「界面横了，录出来还是竖的」。
-        // iOS 26 起 windowScene.interfaceOrientation 废弃，改用 effectiveGeometry，
-        // 它反映的是实际生效的方向（含分屏、方向锁定后的结果）。
-        guard let orientation = window?.windowScene?.effectiveGeometry.interfaceOrientation,
-              orientation != lastOrientation else { return }
-        lastOrientation = orientation
-        controller?.updateRotation(interfaceOrientation: orientation)
+        // 手动锁定优先；否则跟随界面方向。iOS 26 起 interfaceOrientation 废弃，
+        // 用 effectiveGeometry 反映实际生效的方向（含分屏与方向锁定后的结果）。
+        let target = forcedOrientation
+            ?? window?.windowScene?.effectiveGeometry.interfaceOrientation
+        guard let target, target != lastApplied else { return }
+        lastApplied = target
+        controller?.updateRotation(interfaceOrientation: target)
     }
 }

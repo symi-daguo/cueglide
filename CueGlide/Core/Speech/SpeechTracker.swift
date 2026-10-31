@@ -38,6 +38,7 @@ final class SpeechTracker {
     @ObservationIgnored private var continuation: AsyncStream<AnalyzerInput>.Continuation?
     @ObservationIgnored private let log = Logger(subsystem: "com.symi.cueglide", category: "SpeechTracker")
     @ObservationIgnored private var resultsTask: Task<Void, Never>?
+    @ObservationIgnored private var externalTask: Task<Void, Never>?
     @ObservationIgnored private var aligner: ScriptAligner?
     @ObservationIgnored private var accumulated = ""
     @ObservationIgnored private var anchorToken = 0
@@ -67,7 +68,7 @@ final class SpeechTracker {
     /// 开音频引擎——录制和跟读抢麦克风会录成静音。参数是采样率、声道数和投递流，
     /// 全是 Sendable，可以安全跨到采集队列。
     func start(
-        externalAudio: ((Double, AVAudioChannelCount, AsyncStream<AnalyzerInput>.Continuation) -> Void)? = nil
+        externalAudio: ((Double, AVAudioChannelCount, AsyncStream<AudioChunk>.Continuation) -> Void)? = nil
     ) async {
         guard state != .listening, state != .preparing else { return }
         guard let aligner, !aligner.isEmpty else {
@@ -86,8 +87,12 @@ final class SpeechTracker {
             log.info("麦克风与语音识别权限已获取")
             let locale = resolveLocale()
             let format = try await prepareAnalyzer(locale: locale)
-            if let externalAudio, let continuation {
-                externalAudio(format.sampleRate, format.channelCount, continuation)
+            if let externalAudio {
+                // AnalyzerInput 必须在主执行器上构造，采集队列直接构造会崩，
+                // 所以收裸缓冲，在这里（MainActor）再包装后投给识别器。
+                let (chunks, chunkContinuation) = AsyncStream.makeStream(of: AudioChunk.self)
+                externalAudio(format.sampleRate, format.channelCount, chunkContinuation)
+                startExternalPump(chunks)
                 log.info("语音跟读已接管相机音频")
             } else {
                 try await startCapture(format: format)
@@ -188,6 +193,16 @@ final class SpeechTracker {
         return analyzerFormat
     }
 
+    private func startExternalPump(_ chunks: AsyncStream<AudioChunk>) {
+        externalTask?.cancel()
+        externalTask = Task { @MainActor [weak self] in
+            for await chunk in chunks {
+                guard !Task.isCancelled else { return }
+                self?.continuation?.yield(AnalyzerInput(buffer: chunk.buffer))
+            }
+        }
+    }
+
     private func startConsumingResults(transcriber: SpeechTranscriber) {
         resultsTask?.cancel()
         resultsTask = Task { [weak self] in
@@ -265,6 +280,8 @@ final class SpeechTracker {
     // MARK: - 清理
 
     private func teardown() async {
+        externalTask?.cancel()
+        externalTask = nil
         resultsTask?.cancel()
         resultsTask = nil
 
