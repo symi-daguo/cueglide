@@ -99,7 +99,16 @@ final class CameraAudioBridge: @unchecked Sendable {
         }
         #if DEBUG
         if chunkCount % 30 == 1 {
-            print("[Audio] 第 \(chunkCount) 包 \(output.frameLength) 帧 @\(startTime.value)/\(startTime.timescale)")
+            // 顺带算一下响度，用来区分「麦克风没收到声音」和「识别器不出结果」
+            var level: Int64 = 0
+            if let samples = output.int16ChannelData?[0] {
+                var sum: Int64 = 0
+                for index in 0..<Int(output.frameLength) {
+                    sum += Int64(abs(Int(samples[index])))
+                }
+                level = sum / Int64(max(1, output.frameLength))
+            }
+            print("[Audio] 第 \(chunkCount) 包 \(output.frameLength) 帧 响度 \(level)")
         }
         #endif
         continuation.yield(AudioChunk(buffer: output, startTime: startTime))
