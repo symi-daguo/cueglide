@@ -237,7 +237,14 @@ struct CaptureView: View {
     /// 主操作区只放三样：播控、快门、切换镜头。
     /// 参数调节在上一行，视觉上有主次，不会像之前那样六个图标挤成一排。
     private var mainRow: some View {
-        HStack(spacing: 46) {
+        HStack(spacing: 26) {
+            iconButton(
+                viewModel.isVoiceActive ? "waveform.circle.fill" : "waveform.circle",
+                label: viewModel.isVoiceActive ? "关闭语音跟读" : "开启语音跟读"
+            ) {
+                viewModel.toggleVoice()
+            }
+
             iconButton(
                 prompter.engine.isRunning ? "pause.fill" : "play.fill",
                 label: prompter.engine.isRunning ? "暂停提词" : "播放提词"

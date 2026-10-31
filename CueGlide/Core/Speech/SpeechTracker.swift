@@ -61,7 +61,14 @@ final class SpeechTracker {
 
     // MARK: - 启停
 
-    func start() async {
+    /// 启动跟读。
+    ///
+    /// `externalAudio` 不为空时表示音频由外部提供（拍摄时来自相机），此时不自己
+    /// 开音频引擎——录制和跟读抢麦克风会录成静音。参数是采样率、声道数和投递流，
+    /// 全是 Sendable，可以安全跨到采集队列。
+    func start(
+        externalAudio: ((Double, AVAudioChannelCount, AsyncStream<AnalyzerInput>.Continuation) -> Void)? = nil
+    ) async {
         guard state != .listening, state != .preparing else { return }
         guard let aligner, !aligner.isEmpty else {
             state = .unavailable("台本内容为空，无法跟读")
@@ -79,7 +86,12 @@ final class SpeechTracker {
             log.info("麦克风与语音识别权限已获取")
             let locale = resolveLocale()
             let format = try await prepareAnalyzer(locale: locale)
-            try await startCapture(format: format)
+            if let externalAudio, let continuation {
+                externalAudio(format.sampleRate, format.channelCount, continuation)
+                log.info("语音跟读已接管相机音频")
+            } else {
+                try await startCapture(format: format)
+            }
             state = .listening
             log.info("语音跟读已进入监听状态")
         } catch {

@@ -40,6 +40,7 @@
 		A43CB3F347ECE72907D0FB0E /* SpeechAudioCapture.swift in Sources */ = {isa = PBXBuildFile; fileRef = C992D30A1D5CC8B5470C3AF2 /* SpeechAudioCapture.swift */; };
 		A4EAEE1DD949317158D88F42 /* ScrollEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = B18BF6DDF02ADF985D9F6324 /* ScrollEngine.swift */; };
 		B0AC3F7370005C70D8BFF1BD /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D7CFF61518D1201B8E7D0B9 /* RootView.swift */; };
+		B0C976D147FDD991D309DE3E /* CameraAudioBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 89AE2DF62E054D1F1D6026E5 /* CameraAudioBridge.swift */; };
 		B66A79195D3D70E0D4514E3B /* PageHeader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4846B7085BBC40FD59C1254D /* PageHeader.swift */; };
 		C47C06184424989A62998DD5 /* ScriptTokenizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8800E2F8CEB795EF76639BDC /* ScriptTokenizer.swift */; };
 		E75CF0037856F7CDFC79D898 /* SampleText.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC0F7CB91E50D109350E0D69 /* SampleText.swift */; };
@@ -102,6 +103,7 @@
 		88CB044AD3908283267B655C /* FloatingFrameRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FloatingFrameRenderer.swift; sourceTree = "<group>"; };
 		88D3DCE8ACB580DF243B11D5 /* PrompterRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrompterRenderer.swift; sourceTree = "<group>"; };
 		895F0435C1E92C1CEC2A4292 /* FloatingPrompterView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FloatingPrompterView.swift; sourceTree = "<group>"; };
+		89AE2DF62E054D1F1D6026E5 /* CameraAudioBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraAudioBridge.swift; sourceTree = "<group>"; };
 		89FD9E4805EB1DD8314633AC /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		8D08BA2DBB240EDBD21A1F11 /* CameraFormatTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraFormatTests.swift; sourceTree = "<group>"; };
 		919E4794DC7CCB9AB46AF9C3 /* OrientationSnapshotTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OrientationSnapshotTests.swift; sourceTree = "<group>"; };
@@ -231,6 +233,7 @@
 		7867BFE5B76CF92CAFBDB165 /* Capture */ = {
 			isa = PBXGroup;
 			children = (
+				89AE2DF62E054D1F1D6026E5 /* CameraAudioBridge.swift */,
 				731E54652F46F1EB8B920B8F /* CameraController.swift */,
 			);
 			path = Capture;
@@ -485,6 +488,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				6C622880677CA0F1D8F7572A /* AppSettings.swift in Sources */,
+				B0C976D147FDD991D309DE3E /* CameraAudioBridge.swift in Sources */,
 				016E19537B02BCD2B0D68C73 /* CameraController.swift in Sources */,
 				6FA3EB515783AF5C6C50854F /* CaptureView.swift in Sources */,
 				F45C497EF1AFE9EC528054AC /* CaptureViewModel.swift in Sources */,
@@ -604,7 +608,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 0.6.8;
+				MARKETING_VERSION = 0.6.9;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -673,7 +677,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 0.6.8;
+				MARKETING_VERSION = 0.6.9;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;

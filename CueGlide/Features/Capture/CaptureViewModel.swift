@@ -1,6 +1,7 @@
 import SwiftUI
 import AVFoundation
 import Photos
+import os
 
 @MainActor
 @Observable
@@ -33,8 +34,15 @@ final class CaptureViewModel {
             scroll: scroll,
             captureMode: true
         )
-        // 录制独占麦克风，跟读必须关掉
-        self.prompter.allowsVoiceTracking = false
+        // 音频走相机的分流通道，录制和跟读可以同时用
+        let camera = self.camera
+        self.prompter.externalAudioSource = { sampleRate, channels, continuation in
+            camera.attachSpeechAudio(
+                sampleRate: sampleRate,
+                channels: channels,
+                continuation: continuation
+            )
+        }
     }
 
     var isRecording: Bool { phase == .recording }
@@ -51,13 +59,23 @@ final class CaptureViewModel {
             try await camera.configure(position: .front)
             camera.start()
             phase = .ready
+            #if DEBUG
+            await runAutoRecordIfRequested()
+            #endif
         } catch {
             phase = .failed(error.localizedDescription)
         }
     }
 
+    var isVoiceActive: Bool { prompter.isVoiceActive }
+
+    func toggleVoice() {
+        prompter.toggleVoice()
+    }
+
     func teardown() {
         stopTimer()
+        camera.detachSpeechAudio()
         camera.stop()
         if camera.isRecording {
             let camera = self.camera
@@ -115,9 +133,34 @@ final class CaptureViewModel {
             lastSavedMessage = "保存失败：\(error.localizedDescription)"
         }
 
+        // 取证用：把成片复制到 Documents，可以用 devicectl 拷出来做逐项对比。
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("-keepRecording") {
+            let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+            let isLarge = !ProcessInfo.processInfo.arguments.contains("-use4KHDR")
+            let name = isLarge ? "capture-large.mov" : "capture-4k.mov"
+            let dest = docs.appendingPathComponent(name)
+            try? FileManager.default.removeItem(at: dest)
+            try? FileManager.default.copyItem(at: url, to: dest)
+        }
+        #endif
+
         try? FileManager.default.removeItem(at: url)
         phase = .ready
     }
+
+    #if DEBUG
+    /// 自动录一段，用于抓取画质取证样本，不需要人工点按。
+    func runAutoRecordIfRequested() async {
+        guard ProcessInfo.processInfo.arguments.contains("-autoRecord") else { return }
+        guard phase == .ready else { return }
+
+        await startRecording()
+        try? await Task.sleep(for: .seconds(5))
+        guard phase == .recording else { return }
+        await stopRecording()
+    }
+    #endif
 
     /// 读成片实际写入的分辨率与编码器。拍摄参数是否真的生效，
     /// 看这一行就够了，不用去相册翻详情。
@@ -134,7 +177,22 @@ final class CaptureViewModel {
         case kCMVideoCodecType_H264: codecName = "H.264"
         default: codecName = "未知编码"
         }
-        return "\(Int(size.width))×\(Int(size.height)) \(codecName)"
+
+        // 从轨道元数据里读真实码率与传递函数，确认 HDR 确实写进了文件，
+        // 而不是只在采集端开了、写的时候又退回 SDR。
+        let extensions = CMFormatDescriptionGetExtensions(format) as? [String: Any]
+        let transfer = extensions?[kCMFormatDescriptionExtension_TransferFunction as String] as? String
+        let isHDR = transfer == (kCMFormatDescriptionTransferFunction_ITU_R_2100_HLG as String)
+        let bitrate = (try? await track.load(.estimatedDataRate)).map { $0 / 1_000_000 }
+
+        var parts = ["\(Int(size.width))×\(Int(size.height))", codecName]
+        if isHDR { parts.append("HDR") }
+        if let bitrate { parts.append(String(format: "%.0fMbps", bitrate)) }
+
+        let summary = parts.joined(separator: " ")
+        Logger(subsystem: "com.symi.cueglide", category: "Capture")
+            .info("成片参数：\(summary, privacy: .public)")
+        return summary
     }
 
     private func saveToPhotoLibrary(url: URL) async throws {

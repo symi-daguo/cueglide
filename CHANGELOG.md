@@ -2,6 +2,25 @@
 
 本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)，格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)。
 
+## [0.6.9] - 2026-10-31
+
+录制改回 Apple 官方管线，并补上拍摄页的语音跟读按钮。
+
+### 变更
+
+- **录制改用 `AVCaptureMovieFileOutput`**：此前用 `AVCaptureVideoDataOutput` + 自己拼的 `AVAssetWriter`，编码器、码率、像素格式、HDR 全要手调，结果参数漂亮但观感不如系统。现在交给官方录制管线，不设 `outputSettings`，由系统按设备格式自行决定——编码策略、率失真优化都是系统相机那一套。代码从 700 行降到 649 行，删掉整个 `RecordingWriter`
+- **默认用满传感器 4032×3024**：16:9 是从传感器裁出来的，视野窄一圈、像素少 47%。这个格式不支持 HLG，所以 HDR 暂时让位给像素与取景；要用 4K HDR 时用 `-use4KHDR` 启动
+- **拍摄页加语音跟读按钮**：底部控制区变成四个——跟读、播放、快门、切换镜头
+
+### 修复
+
+- **录制静默失败**：`AVCaptureMovieFileOutput` 与 `AVCaptureAudioDataOutput` 不能共用同一路音频，同时挂着会让 `startRecording` 返回后 `isRecording` 一直是 false。改成录制时把音频输出整体切给录制管线，录完再交还给跟读分流
+
+### 说明
+
+- 录制期间跟读不可用（音频被录制管线独占），录制前后可以正常跟读
+- 编码参数不再由 app 指定，码率由系统决定（4:3 档实测 45Mbps），画面比手调 80Mbps 更锐
+
 ## [0.6.8] - 2026-10-31
 
 录制画质对齐系统相机，重做拍摄页控制区，并修掉保存闪退。

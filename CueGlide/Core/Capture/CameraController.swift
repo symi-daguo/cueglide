@@ -2,6 +2,7 @@
 // 用 @preconcurrency 按旧规则处理该模块，避免每处闭包都加一层包装。
 @preconcurrency import AVFoundation
 import UIKit
+import Speech
 import os
 
 /// 相机采集与录制。
@@ -43,10 +44,16 @@ final class CameraController: NSObject, @unchecked Sendable {
 
     /// 每帧音频回调，用于语音跟读。在采集队列上调用，回调方自行切线程。
     var onAudioSample: ((CMSampleBuffer) -> Void)?
+    /// 保持音频桥的强引用，弱引用会被立刻回收。
+    private var speechBridge: CameraAudioBridge?
 
     private let captureQueue = DispatchQueue(label: "com.symi.cueglide.capture")
     private let log = Logger(subsystem: "com.symi.cueglide", category: "Camera")
-    private let videoOutput = AVCaptureVideoDataOutput()
+    /// 录制交给官方的 MovieFileOutput：编码参数、方向、HDR 全由系统管线决定，
+    /// 和系统相机是同一套。之前自己拼 VideoDataOutput + AssetWriter，等于把
+    /// 系统已经做好的事重做一遍，还做不过它。
+    private let movieOutput = AVCaptureMovieFileOutput()
+    /// 仅用于把音频分流给语音跟读，不参与录制。
     private let audioOutput = AVCaptureAudioDataOutput()
 
     private var videoInput: AVCaptureDeviceInput?
@@ -63,11 +70,10 @@ final class CameraController: NSObject, @unchecked Sendable {
 
     /// 用锁保护跨队列读写的少量标量，录制写入器本身只在 captureQueue 上被操作。
     private let stateLock = NSLock()
-    private var _writer: RecordingWriter?
-    /// 已按下录制但还没收到第一帧，等拿到真实画面尺寸再建写入器。
-    private var _pendingRecordingURL: URL?
     private var _position: AVCaptureDevice.Position = .front
     private var _isConfigured = false
+    /// 等待 MovieFileOutput 录音结束的信号。
+    private var _recordingContinuation: CheckedContinuation<URL?, Never>?
 
     var position: AVCaptureDevice.Position {
         stateLock.lock()
@@ -81,41 +87,24 @@ final class CameraController: NSObject, @unchecked Sendable {
         return _isConfigured
     }
 
-    /// 成片是否走 HDR。系统相机默认录 10-bit HLG，这是观感差距最大的地方。
+    /// 成片是否走 HDR，用于日志与界面提示。
     var isHDREnabled: Bool {
         stateLock.lock()
         defer { stateLock.unlock() }
         return _isHDREnabled
     }
 
-    var isRecording: Bool {
-        stateLock.lock()
-        defer { stateLock.unlock() }
-        return _writer != nil || _pendingRecordingURL != nil
-    }
+    var isRecording: Bool { movieOutput.isRecording }
 
-    private var pendingRecordingURL: URL? {
+    private var recordingContinuation: CheckedContinuation<URL?, Never>? {
         get {
             stateLock.lock()
             defer { stateLock.unlock() }
-            return _pendingRecordingURL
+            return _recordingContinuation
         }
         set {
             stateLock.lock()
-            _pendingRecordingURL = newValue
-            stateLock.unlock()
-        }
-    }
-
-    private var writer: RecordingWriter? {
-        get {
-            stateLock.lock()
-            defer { stateLock.unlock() }
-            return _writer
-        }
-        set {
-            stateLock.lock()
-            _writer = newValue
+            _recordingContinuation = newValue
             stateLock.unlock()
         }
     }
@@ -170,7 +159,7 @@ final class CameraController: NSObject, @unchecked Sendable {
         }
 
         // 先定格式再装 input，否则 input 会按设备默认格式接线
-        let hdrEnabled = try configureDevice(device)
+        try configureDevice(device)
 
         let deviceInput = try AVCaptureDeviceInput(device: device)
         guard session.canAddInput(deviceInput) else { throw CaptureError.cannotConfigure }
@@ -185,28 +174,28 @@ final class CameraController: NSObject, @unchecked Sendable {
             }
         }
 
+        // MovieFileOutput 不设 outputSettings，让系统按设备当前格式自己决定
+        // 编码器、码率与色彩——这才是"用官方管线"的意思。
+        // MovieFileOutput 与 AudioDataOutput 不能共用同一路音频，同时挂着会让录制
+        // 静默失败（isRecording 一直是 false）。平时挂 AudioDataOutput 供跟读分流，
+        // 录制时再整体切给 MovieFileOutput，录完换回来。
         if session.outputs.isEmpty {
-            // HDR 必须走 10-bit，否则色深不够、高光会直接切掉。
-            // 非 HDR 用 420v：采集管线和编码器都原生支持，比 32BGRA 省一次色彩转换。
-            videoOutput.videoSettings = [
-                kCVPixelBufferPixelFormatTypeKey as String: hdrEnabled
-                    ? kCVPixelFormatType_420YpCbCr10BiPlanarVideoRange
-                    : kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange
-            ]
-            videoOutput.alwaysDiscardsLateVideoFrames = true
-            videoOutput.setSampleBufferDelegate(self, queue: captureQueue)
-            if session.canAddOutput(videoOutput) {
-                session.addOutput(videoOutput)
-            }
-
             audioOutput.setSampleBufferDelegate(self, queue: captureQueue)
             if session.canAddOutput(audioOutput) {
                 session.addOutput(audioOutput)
             }
         }
 
-        if let connection = videoOutput.connection(with: .video) {
-            if connection.isVideoMirroringSupported {
+        // HDR 是否生效看设备的色彩空间实际值
+        let actualHDR = device.activeColorSpace == .HLG_BT2020
+
+        log.info(
+            "输出状态：movie=\(self.session.outputs.contains(self.movieOutput), privacy: .public) audio=\(self.session.outputs.contains(self.audioOutput), privacy: .public) 音频输入=\(self.session.inputs.contains { ($0 as? AVCaptureDeviceInput)?.device.hasMediaType(.audio) == true }, privacy: .public)"
+        )
+
+        for output in [movieOutput as AVCaptureOutput] {
+            if let connection = output.connection(with: .video),
+               connection.isVideoMirroringSupported {
                 connection.isVideoMirrored = device.position == .front
             }
         }
@@ -214,7 +203,7 @@ final class CameraController: NSObject, @unchecked Sendable {
         stateLock.lock()
         _position = device.position
         _isConfigured = true
-        _isHDREnabled = hdrEnabled
+        _isHDREnabled = actualHDR
         stateLock.unlock()
 
         // 旋转不再写死 90 度，交给系统按设备姿态算
@@ -231,7 +220,7 @@ final class CameraController: NSObject, @unchecked Sendable {
             ? Int((Double(device.activeVideoMinFrameDuration.timescale) / Double(device.activeVideoMinFrameDuration.value)).rounded())
             : 0
         log.info(
-            "相机就绪：\(device.localizedName, privacy: .public) \(dims.width, privacy: .public)×\(dims.height, privacy: .public) @\(fps, privacy: .public)fps，\(hdrEnabled ? "HDR(HLG)" : "SDR", privacy: .public)，格式数 \(device.formats.count, privacy: .public)"
+            "相机就绪：\(device.localizedName, privacy: .public) \(dims.width, privacy: .public)×\(dims.height, privacy: .public) @\(fps, privacy: .public)fps，\(actualHDR ? "HDR(HLG)" : "SDR", privacy: .public)，格式数 \(device.formats.count, privacy: .public)"
         )
     }
 
@@ -278,10 +267,18 @@ final class CameraController: NSObject, @unchecked Sendable {
             return VideoFormatOption(
                 width: dims.width,
                 height: dims.height,
-                maxFrameRate: maxRate
+                maxFrameRate: maxRate,
+                supportsHLG: format.isVideoHDRSupported
+                    && format.supportedColorSpaces.contains(.HLG_BT2020)
             )
         }
-        guard let index = preferredFormatIndex(in: options) else { return nil }
+        // 默认用满传感器（4:3 的 4032×3024）：像素比 4K 16:9 多 47%，取景也更接近
+        // 系统相机的前置预览。16:9 是从传感器里裁出来的，视野会窄一圈。
+        // 想回到 4K HDR（HLG 只有 16:9 格式）时用 `-use4KHDR` 启动。
+        let preferLargeSensor = !ProcessInfo.processInfo.arguments.contains("-use4KHDR")
+        guard let index = preferredFormatIndex(in: options, preferLargeSensor: preferLargeSensor) else {
+            return nil
+        }
         return device.formats[index]
     }
 
@@ -290,6 +287,8 @@ final class CameraController: NSObject, @unchecked Sendable {
         let width: Int32
         let height: Int32
         let maxFrameRate: Double
+        /// 该格式是否支持 10-bit HLG（真正的 HDR 录像）。
+        var supportsHLG: Bool = false
 
         var pixels: Int { Int(width) * Int(height) }
 
@@ -304,13 +303,32 @@ final class CameraController: NSObject, @unchecked Sendable {
         var isUsable: Bool { width > 0 && height > 0 && maxFrameRate >= 30 }
     }
 
-    /// 挑分辨率最高的 16:9 格式，且必须支持 30fps。
-    /// 没有 16:9 就退回最高分辨率，避免个别机型只有 4:3 时反而降档。
-    static func preferredFormatIndex(in options: [VideoFormatOption]) -> Int? {
+    /// 选格式的优先级：16:9 + HLG → 16:9 → 最高分辨率。
+    ///
+    /// 同一个分辨率会存在多个变体（不同像素格式/色彩空间），只按像素排序会随机
+    /// 落到不支持 HLG 的那个上——实测 iPhone 18 Pro Max 前置的 3840×2160 就是
+    /// 这样，像素数一样但只有部分变体支持 HLG，选错就退化成 SDR。
+    static func preferredFormatIndex(
+        in options: [VideoFormatOption],
+        preferLargeSensor: Bool = false
+    ) -> Int? {
         let usable = options.enumerated().filter { $0.element.isUsable }
+
+        if preferLargeSensor {
+            return usable.max { $0.element.pixels < $1.element.pixels }?.offset
+        }
+
+        let hlgWidescreen = usable.filter { $0.element.isWidescreen && $0.element.supportsHLG }
+        if let best = hlgWidescreen.max(by: { $0.element.pixels < $1.element.pixels }) {
+            return best.offset
+        }
+
         let widescreen = usable.filter { $0.element.isWidescreen }
-        let pool = widescreen.isEmpty ? usable : widescreen
-        return pool.max { $0.element.pixels < $1.element.pixels }?.offset
+        if let best = widescreen.max(by: { $0.element.pixels < $1.element.pixels }) {
+            return best.offset
+        }
+
+        return usable.max { $0.element.pixels < $1.element.pixels }?.offset
     }
 
     // MARK: - 旋转
@@ -367,31 +385,39 @@ final class CameraController: NSObject, @unchecked Sendable {
     /// 最高帧率都不同），靠猜会选错档，所以直接把真实列表打出来看。
     private static func dumpFormats(of device: AVCaptureDevice) {
         let probe = Logger(subsystem: "com.symi.cueglide", category: "CameraFormats")
-        probe.info("===== \(device.localizedName, privacy: .public) 共 \(device.formats.count, privacy: .public) 个格式 =====")
 
-        for (index, format) in device.formats.enumerated() {
+        // syslog 会限流，一次性打几十行会被丢掉，所以按分辨率去重、只列关键结论。
+        var seen = Set<String>()
+        var resolutions: [String] = []
+        for format in device.formats {
             let dims = CMVideoFormatDescriptionGetDimensions(format.formatDescription)
-            let subtype = CMFormatDescriptionGetMediaSubType(format.formatDescription)
+            let key = "\(dims.width)x\(dims.height)"
+            guard seen.insert(key).inserted else { continue }
+            let hdr = format.isVideoHDRSupported ? "HDR" : "-"
+            let hlg = format.supportedColorSpaces.contains(.HLG_BT2020) ? "HLG" : "-"
+            let p3 = format.supportedColorSpaces.contains(.P3_D65) ? "P3" : "-"
+            resolutions.append("\(key)[\(hdr)/\(hlg)/\(p3)]")
+        }
+        probe.info("分辨率档位 \(resolutions.count, privacy: .public) 个：\(resolutions.joined(separator: " "), privacy: .public)")
+
+        // 单独列出真正能用 HLG 的格式，这是 HDR 判定的硬条件。
+        let hlgFormats = device.formats.filter {
+            $0.isVideoHDRSupported && $0.supportedColorSpaces.contains(.HLG_BT2020)
+        }
+        var hlgResolutions = Set<String>()
+        for format in hlgFormats {
+            let dims = CMVideoFormatDescriptionGetDimensions(format.formatDescription)
             let rates = format.videoSupportedFrameRateRanges
                 .map { String(format: "%.0f-%.0f", $0.minFrameRate, $0.maxFrameRate) }
                 .joined(separator: "/")
-            let spaces = format.supportedColorSpaces
-                .map { String(describing: $0) }
-                .joined(separator: ",")
-            let hdr = format.isVideoHDRSupported ? "HDR" : "SDR"
-
-            probe.info(
-                "#\(index, privacy: .public) \(dims.width, privacy: .public)x\(dims.height, privacy: .public) @\(rates, privacy: .public) 像素[\(subtype, privacy: .public)] \(hdr, privacy: .public) 色彩[\(spaces, privacy: .public)]"
-            )
+            hlgResolutions.insert("\(dims.width)x\(dims.height)@\(rates)")
         }
+        probe.info("可用 HLG 格式 \(hlgFormats.count, privacy: .public) 个：\(hlgResolutions.sorted().joined(separator: " "), privacy: .public)")
 
         let active = device.activeFormat
         let activeDims = CMVideoFormatDescriptionGetDimensions(active.formatDescription)
         probe.info(
-            "当前 activeFormat：\(activeDims.width, privacy: .public)x\(activeDims.height, privacy: .public)，activeColorSpace=\(device.activeColorSpace.rawValue, privacy: .public)，HDR=\(active.isVideoHDRSupported, privacy: .public)"
-        )
-        probe.info(
-            "设备能力：HDR=\(device.activeFormat.isVideoHDRSupported, privacy: .public)，最大变焦=\(device.maxAvailableVideoZoomFactor, privacy: .public)"
+            "当前 activeFormat \(activeDims.width, privacy: .public)x\(activeDims.height, privacy: .public) HDR=\(active.isVideoHDRSupported, privacy: .public) HLG=\(active.supportedColorSpaces.contains(.HLG_BT2020), privacy: .public) activeColorSpace=\(device.activeColorSpace.rawValue, privacy: .public)"
         )
     }
     #endif
@@ -427,7 +453,7 @@ final class CameraController: NSObject, @unchecked Sendable {
 
         captureQueue.async { [weak self] in
             guard let self,
-                  let connection = self.videoOutput.connection(with: .video),
+                  let connection = self.movieOutput.connection(with: .video),
                   connection.isVideoRotationAngleSupported(capture) else { return }
             connection.videoRotationAngle = capture
         }
@@ -445,6 +471,38 @@ final class CameraController: NSObject, @unchecked Sendable {
             position: position
         )
         return discovery.devices.first
+    }
+
+    /// 把相机音频分流一份给语音识别。
+    ///
+    /// 参数用采样率与声道数而不是 `AVAudioFormat` 本身：后者不是 Sendable，
+    /// 从主线程传给这个非隔离方法会被 Swift 6 判为数据竞争。
+    func attachSpeechAudio(
+        sampleRate: Double,
+        channels: AVAudioChannelCount,
+        continuation: AsyncStream<AnalyzerInput>.Continuation
+    ) {
+        guard let target = AVAudioFormat(
+            standardFormatWithSampleRate: sampleRate,
+            channels: channels
+        ) else {
+            log.error("无法构造识别器要求的音频格式")
+            return
+        }
+
+        let bridge = CameraAudioBridge(targetFormat: target)
+        speechBridge = bridge
+        // 这个闭包在非隔离上下文里创建，不继承主执行器隔离，
+        // 采集队列回调时不会触发隔离断言。
+        onAudioSample = { sampleBuffer in
+            bridge.handle(sampleBuffer, continuation: continuation)
+        }
+        log.info("相机音频已分流到语音识别")
+    }
+
+    func detachSpeechAudio() {
+        onAudioSample = nil
+        speechBridge = nil
     }
 
     // MARK: - 会话控制
@@ -485,7 +543,7 @@ final class CameraController: NSObject, @unchecked Sendable {
 
                     // 换镜头后必须重新选格式：新设备的 activeFormat 是它自己的默认值，
                     // 不重选就会退回低分辨率（之前切到后摄画质掉一档就是这个原因）。
-                    let hdr = (try? self.configureDevice(device)) ?? false
+                    try? self.configureDevice(device)
 
                     guard self.session.canAddInput(newInput) else {
                         if let old = self.videoInput, self.session.canAddInput(old) {
@@ -497,23 +555,17 @@ final class CameraController: NSObject, @unchecked Sendable {
                     self.session.addInput(newInput)
                     self.videoInput = newInput
 
-                    self.videoOutput.videoSettings = [
-                        kCVPixelBufferPixelFormatTypeKey as String: hdr
-                            ? kCVPixelFormatType_420YpCbCr10BiPlanarVideoRange
-                            : kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange
-                    ]
-
                     self.session.commitConfiguration()
+                    let actualHDR = device.activeColorSpace == .HLG_BT2020
 
-                    if let connection = self.videoOutput.connection(with: .video) {
-                        if connection.isVideoMirroringSupported {
-                            connection.isVideoMirrored = device.position == .front
-                        }
+                    if let connection = self.movieOutput.connection(with: .video),
+                       connection.isVideoMirroringSupported {
+                        connection.isVideoMirrored = device.position == .front
                     }
 
                     self.stateLock.lock()
                     self._position = device.position
-                    self._isHDREnabled = hdr
+                    self._isHDREnabled = actualHDR
                     self.stateLock.unlock()
 
                     // 换了镜头，原生方向可能不同，必须重建
@@ -528,239 +580,110 @@ final class CameraController: NSObject, @unchecked Sendable {
 
     // MARK: - 录制
 
-    /// 只登记待录制的目标文件。真正的写入器要等第一帧到达，用画面的真实像素尺寸来建，
-    /// 否则写死分辨率会让成片被拉伸。
+    /// 交给 MovieFileOutput 直接录。
+    ///
+    /// 编码器、码率、HDR、像素格式、方向全由系统管线决定——不设 outputSettings，
+    /// 就是让系统按设备当前格式用它的默认策略，和系统相机同一套。
     func startRecording() async throws {
         guard isConfigured else { throw CaptureError.cannotConfigure }
 
+        // 把音频从分流用的 AudioDataOutput 交给录制管线
+        session.beginConfiguration()
+        if session.outputs.contains(audioOutput) {
+            session.removeOutput(audioOutput)
+        }
+        if !session.outputs.contains(movieOutput), session.canAddOutput(movieOutput) {
+            session.addOutput(movieOutput)
+        }
+        if let connection = movieOutput.connection(with: .video),
+           connection.isVideoMirroringSupported {
+            connection.isVideoMirrored = position == .front
+        }
+        session.commitConfiguration()
+
+        guard movieOutput.connection(with: .video) != nil else {
+            restoreAudioOutput()
+            throw CaptureError.cannotConfigure
+        }
+
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent("cueglide-\(Int(Date().timeIntervalSince1970)).mov")
-        pendingRecordingURL = url
+        movieOutput.startRecording(to: url, recordingDelegate: self)
+        log.info("开始录制")
+    }
+
+    /// 录完把音频输出换回分流模式，跟读才能继续用。
+    private func restoreAudioOutput() {
+        session.beginConfiguration()
+        if session.outputs.contains(movieOutput) {
+            session.removeOutput(movieOutput)
+        }
+        if !session.outputs.contains(audioOutput), session.canAddOutput(audioOutput) {
+            audioOutput.setSampleBufferDelegate(self, queue: captureQueue)
+            session.addOutput(audioOutput)
+        }
+        session.commitConfiguration()
+        log.info("音频输出已交还给跟读分流")
     }
 
     func stopRecording() async -> URL? {
-        await withCheckedContinuation { (continuation: CheckedContinuation<URL?, Never>) in
-            captureQueue.async { [weak self] in
-                guard let self, let current = self.writer else {
-                    continuation.resume(returning: nil)
-                    return
-                }
-                self.writer = nil
-                Task {
-                    let url = await current.finish()
-                    // 录制期间角度被锁住，设备如果在录制中转过，结束后不会再收到
-                    // KVO 更新，必须主动重建一次，否则预览与采集都停在旧角度。
-                    // AVCaptureDevice 不是 Sendable，这里按 position 重新取，
-                    // 不跨队列传设备对象。
-                    let position = self.position
-                    DispatchQueue.main.async {
-                        self.rebuildRotationCoordinator(for: Self.device(for: position))
-                    }
-                    continuation.resume(returning: url)
-                }
-            }
+        log.info("停止录制请求，isRecording=\(self.movieOutput.isRecording, privacy: .public)")
+        guard movieOutput.isRecording else { return nil }
+
+        return await withCheckedContinuation { (continuation: CheckedContinuation<URL?, Never>) in
+            recordingContinuation = continuation
+            movieOutput.stopRecording()
         }
     }
 }
 
-// MARK: - 采样回调
+// MARK: - 录制回调
 
-extension CameraController: AVCaptureVideoDataOutputSampleBufferDelegate,
-                           AVCaptureAudioDataOutputSampleBufferDelegate {
+extension CameraController: AVCaptureFileOutputRecordingDelegate {
+
+    func fileOutput(
+        _ output: AVCaptureFileOutput,
+        didFinishRecordingTo outputFileURL: URL,
+        from connections: [AVCaptureConnection],
+        error: Error?
+    ) {
+        let continuation = recordingContinuation
+        recordingContinuation = nil
+
+        if let error {
+            log.error("录制失败：\(error.localizedDescription, privacy: .public)")
+            continuation?.resume(returning: nil)
+            return
+        }
+
+        log.info("录制完成：\(outputFileURL.lastPathComponent, privacy: .public)")
+        continuation?.resume(returning: outputFileURL)
+
+        // 录制结束把音频输出还给跟读分流
+        let queue = captureQueue
+        queue.async { [weak self] in
+            self?.restoreAudioOutput()
+        }
+
+        // 录制期间角度被锁住，结束后补一次，否则设备在录制中转过之后预览会停在旧角度
+        let position = position
+        DispatchQueue.main.async { [weak self] in
+            self?.rebuildRotationCoordinator(for: Self.device(for: position))
+        }
+    }
+}
+
+// MARK: - 音频分流
+
+extension CameraController: AVCaptureAudioDataOutputSampleBufferDelegate {
 
     func captureOutput(
         _ output: AVCaptureOutput,
         didOutput sampleBuffer: CMSampleBuffer,
         from connection: AVCaptureConnection
     ) {
-        if output === videoOutput {
-            beginWriterIfNeeded(with: sampleBuffer)
-            writer?.appendVideo(sampleBuffer)
-        } else if output === audioOutput {
-            writer?.appendAudio(sampleBuffer)
-            onAudioSample?(sampleBuffer)
-        }
-    }
-}
-
-// MARK: - 首帧建写入器
-
-extension CameraController {
-
-    /// 用第一帧视频的真实宽高创建写入器。相机按设备方向旋转后输出的像素尺寸
-    /// 由 connection 决定，不能假设固定比例。
-    fileprivate func beginWriterIfNeeded(with sampleBuffer: CMSampleBuffer) {
-        guard writer == nil,
-              let url = pendingRecordingURL,
-              let format = CMSampleBufferGetFormatDescription(sampleBuffer) else { return }
-
-        let dimensions = CMVideoFormatDescriptionGetDimensions(format)
-        guard dimensions.width > 0, dimensions.height > 0 else { return }
-
-        pendingRecordingURL = nil
-        let size = CGSize(width: CGFloat(dimensions.width), height: CGFloat(dimensions.height))
-        do {
-            let newWriter = try RecordingWriter(
-                outputURL: url,
-                videoSize: size,
-                isHDR: isHDREnabled
-            )
-            writer = newWriter
-            newWriter.start()
-            log.info("录制开始：\(newWriter.summary, privacy: .public)")
-        } catch {
-            // 建不起来就把临时文件清掉，界面会因为没有写入器而回到未录制状态
-            try? FileManager.default.removeItem(at: url)
-        }
-    }
-}
-
-// MARK: - 写入器
-
-/// 把音视频采样写成 mov。运行在采集队列上，内部不再加锁。
-final class RecordingWriter {
-
-    private let writer: AVAssetWriter
-    private let videoInput: AVAssetWriterInput
-    private let audioInput: AVAssetWriterInput
-    private let outputURL: URL
-    private let videoSize: CGSize
-    private let codec: AVVideoCodecType
-    private let isHDR: Bool
-    private var started = false
-    private var sessionStarted = false
-
-    init(outputURL: URL, videoSize: CGSize, isHDR: Bool = false) throws {
-        self.outputURL = outputURL
-        self.videoSize = videoSize
-        self.isHDR = isHDR
-        try? FileManager.default.removeItem(at: outputURL)
-
-        let assetWriter = try AVAssetWriter(outputURL: outputURL, fileType: .mov)
-        writer = assetWriter
-
-        // HEVC 同画质码率约为 H.264 的一半，iPhone 全系有硬件编码；
-        // 万一当前尺寸不支持再退回 H.264。
-        let hevcSettings = Self.videoSettings(size: videoSize, codec: .hevc, isHDR: isHDR)
-        let chosen: AVVideoCodecType =
-            assetWriter.canApply(outputSettings: hevcSettings, forMediaType: .video) ? .hevc : .h264
-        self.codec = chosen
-        let videoSettings = Self.videoSettings(size: videoSize, codec: chosen, isHDR: isHDR)
-
-        videoInput = AVAssetWriterInput(mediaType: .video, outputSettings: videoSettings)
-        videoInput.expectsMediaDataInRealTime = true
-
-        let audioSettings: [String: Any] = [
-            AVFormatIDKey: kAudioFormatMPEG4AAC,
-            AVNumberOfChannelsKey: 1,
-            AVSampleRateKey: 44100
-        ]
-        audioInput = AVAssetWriterInput(mediaType: .audio, outputSettings: audioSettings)
-        audioInput.expectsMediaDataInRealTime = true
-
-        guard writer.canAdd(videoInput), writer.canAdd(audioInput) else {
-            throw CameraController.CaptureError.writerFailed("无法添加轨道")
-        }
-        writer.add(videoInput)
-        writer.add(audioInput)
-    }
-
-    /// 按像素折算码率。之前不设码率，系统给的默认值在 1080p 以上明显偏紧，
-    /// 4K 会糊成一片。系数按系统相机的实测水平取：HEVC 0.18 bit/像素/帧
-    /// 对应 4K30 约 45Mbps，H.264 需要 0.26 才追得平。
-    static func videoSettings(
-        size: CGSize,
-        codec: AVVideoCodecType,
-        isHDR: Bool = false
-    ) -> [String: Any] {
-        let bitRate = Self.averageBitRate(for: size, codec: codec, isHDR: isHDR)
-
-        var settings: [String: Any] = [
-            AVVideoCodecKey: codec,
-            AVVideoWidthKey: Int(size.width),
-            AVVideoHeightKey: Int(size.height),
-            AVVideoCompressionPropertiesKey: [
-                AVVideoAverageBitRateKey: bitRate,
-                AVVideoExpectedSourceFrameRateKey: 30,
-                AVVideoMaxKeyFrameIntervalKey: 30
-            ]
-        ]
-
-        // HDR 必须声明色彩三要素，否则播放器会按 SDR 解释，画面发灰发暗。
-        if isHDR {
-            settings[AVVideoColorPropertiesKey] = [
-                AVVideoColorPrimariesKey: AVVideoColorPrimaries_ITU_R_2020,
-                AVVideoTransferFunctionKey: AVVideoTransferFunction_ITU_R_2100_HLG,
-                AVVideoYCbCrMatrixKey: AVVideoYCbCrMatrix_ITU_R_2020
-            ]
-        }
-        return settings
-    }
-
-    /// 码率按像素折算。
-    ///
-    /// HEVC 取 0.22 bit/像素/帧，4K30 约 55Mbps——系统相机 4K30 HEVC 实测在
-    /// 50–60Mbps，低于这个数运动画面会出现可见的块状压缩。H.264 效率低，
-    /// 同画质要 0.30。低于 8Mbps 时画面会明显发糊，设个下限兜住小尺寸。
-    static func averageBitRate(
-        for size: CGSize,
-        codec: AVVideoCodecType,
-        isHDR: Bool = false
-    ) -> Int {
-        let pixels = Double(size.width) * Double(size.height)
-
-        // 10-bit 数据量是 8-bit 的 1.5 倍，码率要跟着提，否则高光过渡会出色带。
-        let bitsPerPixel: Double
-        switch (codec, isHDR) {
-        case (.hevc, true): bitsPerPixel = 0.26
-        case (.hevc, false): bitsPerPixel = 0.22
-        case (_, true): bitsPerPixel = 0.34
-        default: bitsPerPixel = 0.30
-        }
-        return max(8_000_000, Int(pixels * 30 * bitsPerPixel))
-    }
-
-    /// 成片里记录的编码器与分辨率，用于界面提示与排查。
-    var summary: String {
-        let dims = "\(Int(videoSize.width))×\(Int(videoSize.height))"
-        let codecName = codec == .hevc ? "HEVC" : "H.264"
-        return isHDR ? "\(dims) \(codecName) HDR" : "\(dims) \(codecName)"
-    }
-
-    func start() {
-        guard writer.startWriting() else {
-            return
-        }
-        started = true
-    }
-
-    func appendVideo(_ buffer: CMSampleBuffer) {
-        guard started, writer.status == .writing, videoInput.isReadyForMoreMediaData else { return }
-        beginSessionIfNeeded(at: buffer)
-        videoInput.append(buffer)
-    }
-
-    func appendAudio(_ buffer: CMSampleBuffer) {
-        guard started, writer.status == .writing, audioInput.isReadyForMoreMediaData else { return }
-        beginSessionIfNeeded(at: buffer)
-        audioInput.append(buffer)
-    }
-
-    /// AVAssetWriter 没有可读的会话开始时间，只能自己记一个标志，首帧到达时开session。
-    private func beginSessionIfNeeded(at buffer: CMSampleBuffer) {
-        guard !sessionStarted else { return }
-        sessionStarted = true
-        writer.startSession(atSourceTime: CMSampleBufferGetPresentationTimeStamp(buffer))
-    }
-
-    func finish() async -> URL? {
-        guard started, writer.status == .writing else {
-            writer.cancelWriting()
-            return nil
-        }
-        videoInput.markAsFinished()
-        audioInput.markAsFinished()
-        await writer.finishWriting()
-        return writer.status == .completed ? outputURL : nil
+        // 视频由 MovieFileOutput 自己录，这里只处理音频（分流给语音跟读）
+        guard output === audioOutput else { return }
+        onAudioSample?(sampleBuffer)
     }
 }

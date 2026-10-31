@@ -1,5 +1,7 @@
 import SwiftUI
 import UIKit
+import AVFoundation
+import Speech
 import Observation
 
 @MainActor
@@ -27,6 +29,10 @@ final class PrompterViewModel {
     /// 是否允许开启语音跟读。录制页要关掉：录制本身占着麦克风，
     /// 跟读再开一个音频会话会把录音掐断，两条链路只能留一条。
     @ObservationIgnored var allowsVoiceTracking = true
+    /// 拍摄时由相机提供音频：设置后跟读不再自己开音频引擎，
+    /// 避免和录像抢麦克风把声音录成静音。
+    @ObservationIgnored var externalAudioSource:
+        ((Double, AVAudioChannelCount, AsyncStream<AnalyzerInput>.Continuation) -> Void)?
 
     enum AdjustTarget: Equatable {
         case none
@@ -261,7 +267,7 @@ final class PrompterViewModel {
         }
 
         Task {
-            await tracker.start()
+            await tracker.start(externalAudio: externalAudioSource)
             guard tracker.state == .listening else {
                 if case .unavailable(let message) = tracker.state {
                     voiceAlert = message
