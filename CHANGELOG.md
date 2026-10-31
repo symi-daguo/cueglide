@@ -2,6 +2,25 @@
 
 本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)，格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)。
 
+## [0.6.17] - 2026-10-31
+
+修掉跟读识别的时间戳问题。
+
+### 修复
+
+- **识别链路可能因时间戳重复而中断**：`SpeechAnalyzer` 要求每个 buffer 的起始时间严格单调递增，重复或回退会抛 `Audio input timestamp overlaps or precedes prior audio input` 并终止转写。此前用 `AnalyzerInput(buffer:)` 完全没传时间戳，由系统推断，长时间运行必然出问题
+- 现在按输出帧数精确累加生成 `CMTime(value: accumulatedFrames, timescale: 16000)`，并在 `AudioChunk` 里随帧传递；同时拒绝 0 帧 buffer（0 帧会产生重复时间戳），`AVAudioConverter.primeMethod` 设为 `.none` 避免首帧补偿带来的漂移
+
+### 参考
+
+- 开源实现 `AIPromptCam`（语音跟随提词器）、`Textream`、`Open Prompter` 的架构对照
+- `LiveTranscriber` 的实时转写管线：明确记录「用帧数累加生成严格单调的 CMTime」是踩过坑后的做法
+
+### 验证
+
+- 真机 console 捕获：16kHz 音频稳定投递（368 帧/包），时间戳 0 → 11040 → 22080 严格递增，音频泵正常消费
+- **识别结果需真人念稿才能验证**，本轮只验到管道连通
+
 ## [0.6.16] - 2026-10-31
 
 修正前置相机的设备发现，动态宽高比这才真正可用。

@@ -197,10 +197,25 @@ final class SpeechTracker {
     private func startExternalPump(_ chunks: AsyncStream<AudioChunk>) {
         externalTask?.cancel()
         externalTask = Task { @MainActor [weak self] in
+            #if DEBUG
+            print("[Voice] 音频泵已启动")
+            #endif
+            var pumped = 0
             for await chunk in chunks {
                 guard !Task.isCancelled else { return }
-                self?.continuation?.yield(AnalyzerInput(buffer: chunk.buffer))
+                pumped += 1
+                let accepted = self?.continuation?.yield(
+                    AnalyzerInput(buffer: chunk.buffer, bufferStartTime: chunk.startTime)
+                )
+                #if DEBUG
+                if pumped % 100 == 1 {
+                    print("[Voice] 泵第 \(pumped) 个 chunk，投递结果 \(String(describing: accepted))")
+                }
+                #endif
             }
+            #if DEBUG
+            print("[Voice] 音频泵结束，共 \(pumped) 个")
+            #endif
         }
     }
 
@@ -243,6 +258,11 @@ final class SpeechTracker {
                 "识别到文本（第 \(self.transcriptCount, privacy: .public) 段）：\(transcript.suffix(24), privacy: .public)"
             )
         }
+        #if DEBUG
+        if transcriptCount % 5 == 1 {
+            print("[Voice] 识别第 \(transcriptCount) 段：\(transcript.suffix(24))")
+        }
+        #endif
         latestTranscript = transcript
 
         let normalized = ScriptTokenizer.normalize(transcript)
@@ -276,6 +296,9 @@ final class SpeechTracker {
     private func commit(token: Int) {
         guard token != matchedToken else { return }
         log.info("跟读命中词索引 \(token, privacy: .public)")
+        #if DEBUG
+        print("[Voice] 命中词索引 \(token)")
+        #endif
         matchedToken = token
         anchorToken = token
         // 位置稳定后清空累积文本，避免旧内容持续把位置压在原地

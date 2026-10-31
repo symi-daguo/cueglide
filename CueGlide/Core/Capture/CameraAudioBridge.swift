@@ -7,6 +7,10 @@ import os
 /// 投递后不再被采集队列改写，独占所有权，所以可以安全跨队列。
 struct AudioChunk: @unchecked Sendable {
     let buffer: AVAudioPCMBuffer
+    /// buffer 在整条流里的起始时间。必须是严格单调递增的精确值，
+    /// 用「总帧数 / 采样率」算秒再转 CMTime 会因浮点漂移产生重复时间戳，
+    /// 引擎会以 `Audio input timestamp overlaps or precedes prior audio input` 中止。
+    let startTime: CMTime
 }
 
 /// 识别器要求的音频格式描述。
@@ -46,6 +50,8 @@ final class CameraAudioBridge: @unchecked Sendable {
     private var sourceFormat: AVAudioFormat?
     private var chunkCount = 0
     private var reportedFormat = false
+    /// 已投递的输出帧总数，用来生成精确时间戳。
+    private var accumulatedFrames: AVAudioFramePosition = 0
     private let log = Logger(subsystem: "com.symi.cueglide", category: "CameraAudioBridge")
 
     init(targetFormat: AVAudioFormat) {
@@ -74,12 +80,29 @@ final class CameraAudioBridge: @unchecked Sendable {
             )
         }
 
-        let output = converted(pcm) ?? pcm
+        guard let output = converted(pcm) ?? Optional(pcm), output.frameLength > 0 else {
+            // 0 帧 buffer 会制造重复时间戳，必须丢弃
+            return
+        }
+
+        let startTime = CMTime(
+            value: accumulatedFrames,
+            timescale: CMTimeScale(targetFormat.sampleRate)
+        )
+        accumulatedFrames += AVAudioFramePosition(output.frameLength)
+
         chunkCount += 1
         if chunkCount == 50 {
-            log.info("相机音频已投递 50 帧（约 \(pcm.frameLength, privacy: .public) 帧/包）")
+            log.info(
+                "相机音频已投递 50 帧，累计 \(self.accumulatedFrames, privacy: .public) 帧"
+            )
         }
-        continuation.yield(AudioChunk(buffer: output))
+        #if DEBUG
+        if chunkCount % 30 == 1 {
+            print("[Audio] 第 \(chunkCount) 包 \(output.frameLength) 帧 @\(startTime.value)/\(startTime.timescale)")
+        }
+        #endif
+        continuation.yield(AudioChunk(buffer: output, startTime: startTime))
     }
 
     /// 相机给的是 44.1/48kHz，识别器通常要 16kHz，必须重采样。
@@ -91,7 +114,10 @@ final class CameraAudioBridge: @unchecked Sendable {
 
         if sourceFormat != buffer.format {
             sourceFormat = buffer.format
-            converter = AVAudioConverter(from: buffer.format, to: target)
+            let newConverter = AVAudioConverter(from: buffer.format, to: target)
+            // 默认的 priming 会为了音质补偿首帧，代价是时间戳漂移；转写不需要这个
+            newConverter?.primeMethod = .none
+            converter = newConverter
             if converter == nil {
                 log.error(
                     "相机音频 \(buffer.format.sampleRate, privacy: .public)Hz 无法转到 \(targetRate, privacy: .public)Hz"
