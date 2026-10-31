@@ -25,6 +25,11 @@ struct ScriptAligner {
     private let tokenStartCharacter: [Int]
     private let tokenCount: Int
 
+    /// 全稿的拼音序列（去声调、去分隔），用于容忍同音字。
+    private let pinyinScript: NSString
+    /// 拼音每个字母对应的、在 `normalizedScript` 中的字符下标。
+    private let pinyinToCharacter: [Int]
+
     /// 参与比对的尾部字符数。
     ///
     /// 这个值直接决定跟手的快慢：取 12 时要求连续说满 12 个字才匹配得上，
@@ -58,6 +63,27 @@ struct ScriptAligner {
         self.characterToToken = mapping
         self.tokenStartCharacter = starts
         self.tokenCount = tokenized.totalTokens
+
+        // 拼音索引：语音识别最常犯的错是同音字（提词 → 提磁 / 提瓷器 / 会背高亮），
+        // 汉字精确比对会整段失配。转成拼音后这些差异就消失了。
+        var pinyinChars: [Character] = []
+        var pinyinMapping: [Int] = []
+        for (index, ch) in chars.enumerated() {
+            for letter in Self.pinyin(of: String(ch)) {
+                pinyinChars.append(letter)
+                pinyinMapping.append(index)
+            }
+        }
+        self.pinyinScript = String(pinyinChars) as NSString
+        self.pinyinToCharacter = pinyinMapping
+    }
+
+    /// 取字符串的拼音，去声调、只留字母数字。
+    private static func pinyin(of text: String) -> String {
+        let mutable = NSMutableString(string: text) as CFMutableString
+        CFStringTransform(mutable, nil, kCFStringTransformToLatin, false)
+        CFStringTransform(mutable, nil, kCFStringTransformStripDiacritics, false)
+        return (mutable as String).filter { $0.isLetter || $0.isNumber }.lowercased()
     }
 
     var isEmpty: Bool { tokenCount == 0 || characterToToken.isEmpty }
@@ -68,6 +94,41 @@ struct ScriptAligner {
     ///   - currentToken: 当前所在词索引，作为局部搜索的锚点。
     func align(spoken: String, currentToken: Int) -> Match? {
         guard !isEmpty else { return nil }
+        if let match = alignExact(spoken: spoken, currentToken: currentToken) {
+            return match
+        }
+        return alignByPinyin(spoken: spoken, currentToken: currentToken)
+    }
+
+    /// 拼音兜底：汉字比对失败时，把尾部换成拼音再找一次。
+    ///
+    /// 实测识别文本里「提词器 → 提瓷器」「会被 → 会背」这类同音错误很常见，
+    /// 精确比对会整段失配，表现为「念了但画面不动」。
+    private func alignByPinyin(spoken: String, currentToken: Int) -> Match? {
+        guard pinyinScript.length > 0 else { return nil }
+
+        let trimmed = String(spoken.suffix(queryLength))
+        let query = Self.pinyin(of: trimmed)
+        // 太短的拼音序列区分度不够，容易误配
+        guard query.count >= 6 else { return nil }
+
+        let nsQuery = query as NSString
+        let range = pinyinScript.range(of: query, options: .backwards)
+        guard range.location != NSNotFound, range.location < pinyinToCharacter.count else {
+            return nil
+        }
+
+        let characterIndex = pinyinToCharacter[range.location]
+        guard characterIndex < characterToToken.count else { return nil }
+        let token = characterToToken[characterIndex]
+        return Match(
+            tokenIndex: token,
+            distance: token - currentToken,
+            isGlobal: true
+        )
+    }
+
+    private func alignExact(spoken: String, currentToken: Int) -> Match? {
 
         let trimmed = String(spoken.suffix(queryLength * 2))
         guard trimmed.count >= 3 else { return nil }

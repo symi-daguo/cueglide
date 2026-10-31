@@ -58,6 +58,24 @@ final class ScriptAlignerTests: XCTestCase {
         XCTAssertLessThan(positions.last ?? 99, 20, "说 12 个字不应直接跳到很远的位置")
     }
 
+    /// 同音字错误必须仍能命中。
+    ///
+    /// 实测识别结果里「提词器 → 提瓷器」「会被 → 会背」这类同音错误很常见，
+    /// 精确字符比对会整段失配，用户感受就是「念了但画面不动」。
+    func testToleratesHomophoneErrors() {
+        let (aligner, _) = make("这是一款开源免费的提词器，现在你看到的就是提词页。")
+        let match = aligner.align(spoken: "这是一款开源免费的提瓷器", currentToken: 0)
+        XCTAssertNotNil(match, "同音字应当仍能命中")
+        XCTAssertLessThanOrEqual(match!.tokenIndex, 12, "位置应落在开头附近")
+    }
+
+    /// 拼音兜底不能把无关内容硬匹配上来。
+    func testPinyinDoesNotMatchUnrelatedText() {
+        let (aligner, _) = make("这是一款开源免费的提词器，现在你看到的就是提词页。")
+        let match = aligner.align(spoken: "完全无关的另一段文字内容", currentToken: 0)
+        XCTAssertNil(match, "无关内容不应命中")
+    }
+
     /// 跳段找回：稿子长度超过局部窗口，从开头跳到最后一段，必须走全稿搜索。
     func testJumpForwardFound() {
         let body = longBody
