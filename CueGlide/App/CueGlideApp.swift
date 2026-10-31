@@ -9,7 +9,7 @@ struct CueGlideApp: App {
 
     init() {
         do {
-            container = try ModelContainer(for: Script.self)
+            container = try ModelContainer(for: Script.self, CustomTemplate.self)
         } catch {
             fatalError("本地数据库初始化失败：\(error.localizedDescription)")
         }
