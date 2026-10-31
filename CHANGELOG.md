@@ -2,6 +2,21 @@
 
 本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)，格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)。
 
+## [0.6.16] - 2026-10-31
+
+修正前置相机的设备发现，动态宽高比这才真正可用。
+
+### 修复
+
+- **一直没拿到 Center Stage 那台相机**：WWDC26 Session 341 明确，iPhone 17 / Air / 17 Pro 的方形前置在 API 里是**前向的 `.builtInUltraWideCamera`**，而我一直用 `.builtInWideAngleCamera`。拿到的普通 4x3 前置没有 `supportedDynamicAspectRatios`，所以无论怎么设宽高比都不生效，只能退回旋转画面
+- 现在前置优先通过 `DiscoverySession([.builtInUltraWideCamera], .video, .front)` 取设备；格式选择最高优先级给「支持 16x9 / 9x16 动态宽高比」的方形格式
+- 宽高比常量改用官方静态成员 `.ratio16x9` / `.ratio9x16`
+
+### 依据
+
+- WWDC 2026 Session 341《Support the Center Stage front camera in your iOS app》
+- 同一份资料确认：**前置相机忽略 `videoRotationAngle`**，这也解释了此前设角度无效
+
 ## [0.6.15] - 2026-10-31
 
 用 iOS 26 的动态宽高比实现真正的横竖构图切换。

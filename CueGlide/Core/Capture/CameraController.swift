@@ -300,7 +300,11 @@ final class CameraController: NSObject, @unchecked Sendable {
                 height: dims.height,
                 maxFrameRate: maxRate,
                 supportsHLG: format.isVideoHDRSupported
-                    && format.supportedColorSpaces.contains(.HLG_BT2020)
+                    && format.supportedColorSpaces.contains(.HLG_BT2020),
+                supportsDynamicAspectRatio: format.supportedDynamicAspectRatios.contains { ratio in
+                    ratio == AVCaptureDevice.AspectRatio.ratio16x9
+                        || ratio == AVCaptureDevice.AspectRatio.ratio9x16
+                }
             )
         }
         // 默认走 16:9：这是手机视频的标准比例，系统相机录的也是 16:9 / 9:16。
@@ -320,6 +324,8 @@ final class CameraController: NSObject, @unchecked Sendable {
         let maxFrameRate: Double
         /// 该格式是否支持 10-bit HLG（真正的 HDR 录像）。
         var supportsHLG: Bool = false
+        /// 该格式是否支持 16x9 / 9x16 的动态宽高比（方形传感器才有）。
+        var supportsDynamicAspectRatio: Bool = false
 
         var pixels: Int { Int(width) * Int(height) }
 
@@ -347,6 +353,12 @@ final class CameraController: NSObject, @unchecked Sendable {
 
         if preferLargeSensor {
             return usable.max { $0.element.pixels < $1.element.pixels }?.offset
+        }
+
+        // 最高优先级：能切 16x9 / 9x16 的方形格式——只有它能做「竖着拿拍横片」
+        let dynamic = usable.filter { $0.element.supportsDynamicAspectRatio }
+        if let best = dynamic.max(by: { $0.element.pixels < $1.element.pixels }) {
+            return best.offset
         }
 
         let hlgWidescreen = usable.filter { $0.element.isWidescreen && $0.element.supportsHLG }
@@ -412,7 +424,7 @@ final class CameraController: NSObject, @unchecked Sendable {
         }
 
         let isLandscape = orientation == .landscapeLeft || orientation == .landscapeRight
-        let target = AVCaptureDevice.AspectRatio(rawValue: isLandscape ? "16x9" : "9x16")
+        let target: AVCaptureDevice.AspectRatio = isLandscape ? .ratio16x9 : .ratio9x16
         guard supported.contains(target) else {
             log.info(
                 "宽高比 \(target.rawValue, privacy: .public) 不在支持列表：\(supported.map(\.rawValue).joined(separator: ","), privacy: .public)"
@@ -571,9 +583,25 @@ final class CameraController: NSObject, @unchecked Sendable {
         }
     }
 
-    /// 明确要主摄（wide）。超广角画质更差、暗光噪点更多，
-    /// 之前用 `devices.first` 拿到的顺序并不保证，可能落到超广角上。
+    /// 取设备。**前置必须优先 `.builtInUltraWideCamera`**。
+    ///
+    /// WWDC26 Session 341：iPhone 17 / Air / 17 Pro 的 Center Stage 前置是方形传感器，
+    /// 在 API 里正是前向的 `.builtInUltraWideCamera`，只有它支持
+    /// `supportedDynamicAspectRatios`（1x1/16x9/9x16/4x3/3x4）。
+    /// 用 `.builtInWideAngleCamera` 拿到的是普通 4x3 前置，没有动态宽高比，
+    /// 这就是之前怎么设宽高比都不生效的原因。
     private static func device(for position: AVCaptureDevice.Position) -> AVCaptureDevice? {
+        if position == .front {
+            let centerStage = AVCaptureDevice.DiscoverySession(
+                deviceTypes: [.builtInUltraWideCamera],
+                mediaType: .video,
+                position: .front
+            )
+            if let device = centerStage.devices.first {
+                return device
+            }
+        }
+
         if let wide = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: position) {
             return wide
         }
