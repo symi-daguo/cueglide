@@ -2,6 +2,29 @@
 
 本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)，格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)。
 
+## [0.6.32] - 2026-10-31
+
+发布前收尾：清零编译警告，补齐内存实测数据。
+
+### 修复
+
+- `ScriptAligner.alignByPinyin` 里遗留的未使用变量 `nsQuery`（拼音比对改用 `NSString.range` 后不再需要），Release 构建警告归零
+
+### 验证数据
+
+真机 iPhone 18 Pro Max，`-memoryProbe` 每 2 秒采样，进入提词页并开启跟读 35 秒：
+
+| 阶段 | phys_footprint | 常驻 |
+|---|---|---|
+| 冷启动 | 12.1MB | 38.8MB |
+| 初始化峰值 | 58.4MB | 96.9MB |
+| 稳定（4–14 秒） | 33.7–35.9MB | 95.8–96.9MB |
+| 跟读运行（19 秒后） | 36.3MB | 101.2MB |
+
+**35 秒内无增长趋势，无泄漏**。跟读启动时 +2.6MB 是端侧语音模型常驻，属预期。
+
+Release 包体 4.9MB（较上一版 3.5MB 增加，主要是新图标与拼音索引）。
+
 ## [0.6.31] - 2026-10-31
 
 README 改为使用导向，补内存采样输出。

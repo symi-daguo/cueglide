@@ -112,7 +112,6 @@ struct ScriptAligner {
         // 太短的拼音序列区分度不够，容易误配
         guard query.count >= 6 else { return nil }
 
-        let nsQuery = query as NSString
         let range = pinyinScript.range(of: query, options: .backwards)
         guard range.location != NSNotFound, range.location < pinyinToCharacter.count else {
             return nil
