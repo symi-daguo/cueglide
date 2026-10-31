@@ -2,6 +2,21 @@
 
 本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)，格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)。
 
+## [0.6.18] - 2026-10-31
+
+跟读的延迟与准确性大幅改善。
+
+### 修复
+
+- **识别结果要等整句才出**：手写配置只有 `reportingOptions: [.volatileResults]`，漏了 `fastResults`。对照 Apple 官方 preset 表格，`progressiveTranscription` / `timeIndexedProgressiveTranscription` 都是 volatile + fast 同时开启。已补齐，并加上 `attributeOptions: [.audioTimeRange]` 拿到词级时间区间——等价于官方 `.timeIndexedProgressiveTranscription`
+- **对齐不准、跳词**：`SpeechTranscriber` 的 volatile 结果是**累积重发**（同一句会连着给几个版本，每次都是完整文本），而旧代码对它做 `accumulated.append`，文本变成「今天天气今天天气不错今天天气不错很好」，匹配自然全乱。改为 volatile 覆盖、final 追加，两者拼接后再对齐
+- 启动与停止时一并清空 `finalizedTranscript` / `volatileTranscript`，避免第二次跟读带着上次的文本
+
+### 依据
+
+- Apple 官方 `SpeechTranscriber.Preset` 文档的 preset 配置对照表
+- 官方示例中 volatile / final 的分离处理方式
+
 ## [0.6.17] - 2026-10-31
 
 修掉跟读识别的时间戳问题。

@@ -40,6 +40,9 @@ final class SpeechTracker {
     @ObservationIgnored private var resultsTask: Task<Void, Never>?
     @ObservationIgnored private var externalTask: Task<Void, Never>?
     @ObservationIgnored private var transcriptCount = 0
+    /// 已定稿文本与被 volatile 覆盖的当前句，两者拼接才是完整听写内容。
+    @ObservationIgnored private var finalizedTranscript = ""
+    @ObservationIgnored private var volatileTranscript = ""
     @ObservationIgnored private var aligner: ScriptAligner?
     @ObservationIgnored private var accumulated = ""
     @ObservationIgnored private var anchorToken = 0
@@ -58,6 +61,8 @@ final class SpeechTracker {
         anchorToken = token
         matchedToken = token
         accumulated = ""
+        finalizedTranscript = ""
+        volatileTranscript = ""
         pendingJumpToken = nil
     }
 
@@ -79,6 +84,8 @@ final class SpeechTracker {
 
         state = .preparing
         accumulated = ""
+        finalizedTranscript = ""
+        volatileTranscript = ""
         pendingJumpToken = nil
         latestTranscript = ""
 
@@ -163,11 +170,16 @@ final class SpeechTracker {
             throw TrackerError.unsupportedLocale(locale.localizedString(forIdentifier: target) ?? target)
         }
 
+        // 必须同时开 volatileResults 与 fastResults：
+        //   volatileResults —— 实时给初步结果，否则要等整句 final 才更新（就是「很慢」的原因）
+        //   fastResults     —— 快速出结果，官方 progressive 预设才会带上
+        //   audioTimeRange  —— 每个词带音频时间区间，做词级对齐更准
+        // 这正好等价于官方预设 .timeIndexedProgressiveTranscription。
         let transcriber = SpeechTranscriber(
             locale: locale,
             transcriptionOptions: [],
-            reportingOptions: [.volatileResults],
-            attributeOptions: []
+            reportingOptions: [.volatileResults, .fastResults],
+            attributeOptions: [.audioTimeRange]
         )
         self.transcriber = transcriber
 
@@ -225,8 +237,7 @@ final class SpeechTracker {
             do {
                 for try await result in transcriber.results {
                     guard !Task.isCancelled else { return }
-                    let text = String(result.text.characters)
-                    self?.handle(transcript: text)
+                    self?.consume(result: result)
                 }
             } catch {
                 guard !Task.isCancelled else { return }
@@ -250,6 +261,26 @@ final class SpeechTracker {
 
     // MARK: - 对齐
 
+    /// 区分 volatile 与 final。
+    ///
+    /// `SpeechTranscriber` 的 volatile 结果是**累积重发**的——同一句话会连着给几个版本，
+    /// 每次都是从头开始的完整文本。早期实现直接 `accumulated.append`，文本就变成
+    /// 「今天天气今天天气不错今天天气不错很好」，对齐全乱，表现为跳词、不准。
+    /// 正确做法：volatile 覆盖，final 追加，两者拼接后交给对齐器。
+    private func consume(result: SpeechTranscriber.Result) {
+        let text = String(result.text.characters)
+        if result.isFinal {
+            finalizedTranscript.append(text)
+            if finalizedTranscript.count > 400 {
+                finalizedTranscript = String(finalizedTranscript.suffix(300))
+            }
+            volatileTranscript = ""
+        } else {
+            volatileTranscript = text
+        }
+        handle(transcript: finalizedTranscript + volatileTranscript)
+    }
+
     private func handle(transcript: String) {
         guard let aligner else { return }
         transcriptCount += 1
@@ -268,12 +299,9 @@ final class SpeechTracker {
         let normalized = ScriptTokenizer.normalize(transcript)
         guard !normalized.isEmpty else { return }
 
-        accumulated.append(normalized)
-        if accumulated.count > 80 {
-            accumulated = String(accumulated.suffix(60))
-        }
-
-        guard let match = aligner.align(spoken: accumulated, currentToken: anchorToken) else {
+        // transcript 本身已是「final + 当前 volatile」的完整文本，直接对齐，
+        // 不能再往 accumulated 里追加，否则重复内容会把匹配带偏。
+        guard let match = aligner.align(spoken: normalized, currentToken: anchorToken) else {
             return
         }
 
