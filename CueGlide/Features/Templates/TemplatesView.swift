@@ -16,7 +16,10 @@ struct TemplatesView: View {
     private struct EditorItem: Identifiable {
         let id = UUID()
         let template: CustomTemplate?
+        var draft: TemplatePromptKit.Parsed?
     }
+
+    @State private var showsAIAssistant = false
 
     private var builtInTemplates: [ScriptTemplate] {
         TemplateCatalog.templates(in: scene)
@@ -37,6 +40,7 @@ struct TemplatesView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     PageHeader(title: "模板", subtitle: "选一个骨架开始，也可以做自己的")
+                    aiEntry
                     scenePicker
 
                     LazyVGrid(columns: columns, spacing: 12) {
@@ -62,9 +66,50 @@ struct TemplatesView: View {
                 ScriptEditorView(script: script)
             }
             .sheet(item: $editorItem) { item in
-                TemplateEditorView(template: item.template)
+                TemplateEditorView(template: item.template, draft: item.draft)
+            }
+            .sheet(isPresented: $showsAIAssistant) {
+                TemplateAIAssistantView { parsed in
+                    editorItem = EditorItem(template: nil, draft: parsed)
+                }
             }
         }
+    }
+
+    /// 引导用户用外部 AI 生成模板骨架与配图风格，再把结果粘回来。
+    private var aiEntry: some View {
+        Button {
+            showsAIAssistant = true
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: "sparkles")
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundStyle(Theme.brand)
+                    .frame(width: 34, height: 34)
+                    .background(Theme.brand.opacity(0.12), in: .circle)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("没有思路？让 AI 帮你写")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(Theme.textPrimary)
+                    Text("复制提示词去对话，把回复贴回来就自动填好")
+                        .font(.system(size: 11))
+                        .foregroundStyle(Theme.textSecondary)
+                }
+
+                Spacer()
+
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(Theme.textTertiary)
+            }
+            .padding(12)
+            .background(Theme.surface, in: .rect(cornerRadius: 14))
+            .overlay {
+                RoundedRectangle(cornerRadius: 14).stroke(Theme.hairline, lineWidth: 0.5)
+            }
+        }
+        .buttonStyle(.plain)
     }
 
     private var scenePicker: some View {

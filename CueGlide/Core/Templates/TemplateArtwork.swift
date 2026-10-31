@@ -19,6 +19,11 @@ enum TemplateArtwork {
         "ArtworkGrid",
         "ArtworkWave",
         "ArtworkPaper",
+        "ArtworkStage",
+        "ArtworkCoffee",
+        "ArtworkChart",
+        "ArtworkBubble",
+        "ArtworkArrow",
     ]
 
     /// 按标识取图，取不到时退回第一张内置图，避免界面出现空白。

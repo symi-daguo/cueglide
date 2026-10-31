@@ -26,12 +26,15 @@ struct TemplateEditorView: View {
         TemplateCatalog.scenes.filter { $0 != "全部" } + ["自定义"]
     }
 
-    init(template: CustomTemplate? = nil) {
+    /// - Parameters:
+    ///   - template: 传值表示编辑已有模板，传 nil 表示新建。
+    ///   - draft: 从「用 AI 生成」解析出来的字段，用于新建时预填。
+    init(template: CustomTemplate? = nil, draft: TemplatePromptKit.Parsed? = nil) {
         existing = template
-        _title = State(initialValue: template?.title ?? "")
-        _scene = State(initialValue: template?.scene ?? "自定义")
-        _summary = State(initialValue: template?.summary ?? "")
-        _scriptBody = State(initialValue: template?.body ?? "")
+        _title = State(initialValue: template?.title ?? draft?.title ?? "")
+        _scene = State(initialValue: template?.scene ?? draft?.scene ?? "自定义")
+        _summary = State(initialValue: template?.summary ?? draft?.summary ?? "")
+        _scriptBody = State(initialValue: template?.body ?? draft?.body ?? "")
         _artwork = State(initialValue: template?.artwork ?? "asset:TemplateHook")
     }
 
