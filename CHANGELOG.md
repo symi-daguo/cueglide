@@ -2,6 +2,19 @@
 
 本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)，格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)。
 
+## [0.6.15] - 2026-10-31
+
+用 iOS 26 的动态宽高比实现真正的横竖构图切换。
+
+### 修复
+
+- **横竖切换一直是「旋转画面」而不是「切换构图」**：iPhone 17/18 前置是方形传感器，iOS 26 提供 `AVCaptureDevice.dynamicAspectRatio` + `AVCaptureDeviceFormat.supportedDynamicAspectRatios`（1x1 / 16x9 / 9x16 / 4x3 / 3x4），相机可以**直接按 16x9 或 9x16 输出**，这才是系统相机切换横竖的方式。之前用 `videoRotationAngle` 把竖画面转 90/180 度，所以内容永远是歪的
+- 现在界面方向变化时先切 `dynamicAspectRatio`（横屏 16x9、竖屏 9x16），角度归 0；只有不支持该 API 的机型才退回旋转
+
+### 说明
+
+- 未完成真机验证：`idevicesyslog` 在设备重连后采集中断，无法读取「动态宽高比」日志确认设备是否支持
+
 ## [0.6.14] - 2026-10-31
 
 录制改回 VideoDataOutput 管线，让「竖着拿也能拍横屏」真正可用。

@@ -223,11 +223,19 @@ final class CameraController: NSObject, @unchecked Sendable {
             connection.isVideoMirrored = false
         }
 
+        Self.supportsDynamicAspectRatio = !device.activeFormat.supportedDynamicAspectRatios.isEmpty
+        log.info(
+            "动态宽高比：\(Self.supportsDynamicAspectRatio, privacy: .public)，可选 \(device.activeFormat.supportedDynamicAspectRatios.map(\.rawValue).joined(separator: ","), privacy: .public)"
+        )
+
         stateLock.lock()
         _position = device.position
         _isConfigured = true
         _isHDREnabled = actualHDR
         stateLock.unlock()
+
+        // 首次配置按当前界面方向设定宽高比
+        applyDynamicAspectRatio(lastInterfaceOrientation)
 
         // 旋转不再写死 90 度，交给系统按设备姿态算
         rebuildRotationCoordinator(for: device)
@@ -384,7 +392,48 @@ final class CameraController: NSObject, @unchecked Sendable {
     /// 不受重力影响；低于 27 退回重力角度。
     func updateRotation(interfaceOrientation: UIInterfaceOrientation) {
         lastInterfaceOrientation = interfaceOrientation
+        applyDynamicAspectRatio(interfaceOrientation)
         applyRotationForCurrentInterface()
+    }
+
+    /// 按界面方向切换相机的输出宽高比。
+    ///
+    /// iPhone 17/18 的前置是方形传感器，iOS 26 起提供 `dynamicAspectRatio`，
+    /// 相机可以**直接按 16x9 或 9x16 输出**——这是系统相机切换横竖的方式，
+    /// 不是把画面旋转 90 度。之前的实现一直在转画面，所以内容永远是歪的。
+    private func applyDynamicAspectRatio(_ orientation: UIInterfaceOrientation) {
+        guard !isRecording else { return }
+        guard let device = Self.device(for: position) else { return }
+
+        let supported = device.activeFormat.supportedDynamicAspectRatios
+        guard !supported.isEmpty else {
+            log.info("当前格式不支持 dynamicAspectRatio，退回旋转方式")
+            return
+        }
+
+        let isLandscape = orientation == .landscapeLeft || orientation == .landscapeRight
+        let target = AVCaptureDevice.AspectRatio(rawValue: isLandscape ? "16x9" : "9x16")
+        guard supported.contains(target) else {
+            log.info(
+                "宽高比 \(target.rawValue, privacy: .public) 不在支持列表：\(supported.map(\.rawValue).joined(separator: ","), privacy: .public)"
+            )
+            return
+        }
+        guard device.dynamicAspectRatio != target else { return }
+
+        do {
+            try device.lockForConfiguration()
+            device.setDynamicAspectRatio(target) { _, error in
+                if let error {
+                    Logger(subsystem: "com.symi.cueglide", category: "Camera")
+                        .error("切换宽高比失败：\(error.localizedDescription, privacy: .public)")
+                }
+            }
+            device.unlockForConfiguration()
+            log.info("宽高比切到 \(target.rawValue, privacy: .public)")
+        } catch {
+            log.error("切换宽高比异常：\(error.localizedDescription, privacy: .public)")
+        }
     }
 
     private func applyRotationForCurrentInterface() {
@@ -410,7 +459,14 @@ final class CameraController: NSObject, @unchecked Sendable {
     /// 不用 `videoRotationAngleRelative(toDeviceOrientation:)`：实测它对
     /// `landscapeRight` 返回 270，那是竖屏角度，设下去画面尺寸不变。
     /// 这里直接给角度：横屏 0 / 180 会让宽高互换，竖屏 90 / 270 保持竖构图。
+    /// 宽高比负责构图，角度只做微调。
+    ///
+    /// 支持 `dynamicAspectRatio` 的机型（iPhone 17/18 前置方形传感器）由相机
+    /// 直接输出 9x16 / 16x9，角度保持 0；不支持的机型才需要 90 度旋转。
     private static func captureAngle(for orientation: UIInterfaceOrientation) -> CGFloat {
+        guard !Self.supportsDynamicAspectRatio else {
+            return 0
+        }
         switch orientation {
         case .portrait:
             return 90
@@ -424,6 +480,9 @@ final class CameraController: NSObject, @unchecked Sendable {
             return 90
         }
     }
+
+    /// 是否需要靠旋转来摆正画面。由 `configureSession` 在选中格式后更新。
+    nonisolated(unsafe) private static var supportsDynamicAspectRatio = false
 
     #if DEBUG
     /// 把设备支持的全部格式打到日志，用于核对原生能力。
