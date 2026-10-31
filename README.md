@@ -116,7 +116,20 @@ xcodebuild -project CueGlide.xcodeproj \
   build
 ```
 
-安装到自己的设备时，需要在 Xcode 的 Signing & Capabilities 里选择自己的开发者账号，并把 Bundle Identifier 改成唯一值。
+### 装到自己的 iPhone / iPad
+
+开源仓库不附带证书，需要用自己的 Apple ID 签名：
+
+1. 打开 `CueGlide.xcodeproj`，选中 `CueGlide` target → **Signing & Capabilities** → Team 选自己的账号
+2. **Bundle Identifier 改成唯一值**，例如 `com.你的名字.cueglide`（`com.symi.cueglide` 是官方版本占用，你签不了）
+3. `CueGlideTests` 与 `CueGlideUITests` 两个 target 的 Bundle ID 也要一起改，保持「主 ID + .tests / .uitests」的前缀关系
+4. 连上真机，选设备后 `Cmd+R`
+
+**免费 Apple ID 的限制**：签名 7 天过期，到期后重新运行一次即可，App 里的数据不受影响。相机、麦克风、语音识别这些权限免费账号都能用，**不需要付费开发者账号**。
+
+### 直接用 App Store 版本
+
+如果已上架，在 App Store 搜索「提个词」安装即可，不需要 Xcode、不需要 Mac。这是给不想折腾编译的普通用户准备的路径。
 
 ## 项目结构
 
