@@ -105,4 +105,53 @@ final class ScrollEngineTests: XCTestCase {
         engine.nudge(byTokens: -10)
         XCTAssertEqual(engine.livePosition, 0)
     }
+
+    /// 跟读必须跟得上正常语速。
+    ///
+    /// 这条锁的是一个真实事故：早期把上限写成 `1.2 * delta`（每秒 1.2 词），
+    /// 而中文语速有 4–6 字/秒，导致画面恒定落后、越拉越远。
+    func testVoiceStepKeepsUpWithNormalSpeech() {
+        let dt = 1.0 / 60.0
+        var position = 0.0
+        var target = 0.0
+
+        // 目标以 5 词/秒前移，模拟正常朗读，跑 5 秒
+        for _ in 0..<300 {
+            target += 5.0 * dt
+            position = ScrollEngine.voiceStep(position: position, target: target, delta: dt)
+        }
+
+        XCTAssertLessThan(
+            abs(target - position), 2.0,
+            "落后不应超过 2 个词，超出就是速度上限算错了"
+        )
+    }
+
+    /// 目标停止前移后，位置应该平滑收敛到目标，不发散也不来回抖。
+    func testVoiceStepConvergesWithoutOvershoot() {
+        let dt = 1.0 / 60.0
+        var position = 0.0
+        let target = 10.0
+
+        for _ in 0..<240 {
+            position = ScrollEngine.voiceStep(position: position, target: target, delta: dt)
+        }
+
+        XCTAssertEqual(position, target, accuracy: 0.2, "4 秒内应收敛到目标")
+    }
+
+    /// 大跨度跳段时不能一帧飞过去，但也要在合理时间内追上。
+    func testVoiceStepHandlesLargeJump() {
+        let dt = 1.0 / 60.0
+        var position = 0.0
+        let target = 100.0
+
+        let afterOneFrame = ScrollEngine.voiceStep(position: position, target: target, delta: dt)
+        XCTAssertLessThan(afterOneFrame, 1.0, "单帧位移要受上限约束")
+
+        for _ in 0..<600 where position < target {
+            position = ScrollEngine.voiceStep(position: position, target: target, delta: dt)
+        }
+        XCTAssertEqual(position, target, accuracy: 1.0, "10 秒内应追上 100 词的跳转")
+    }
 }

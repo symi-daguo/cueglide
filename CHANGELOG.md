@@ -2,6 +2,25 @@
 
 本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)，格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)。
 
+## [0.6.22] - 2026-10-31
+
+修掉跟读「永远追不上」的数量级错误。
+
+### 修复
+
+- **说一句落后一句，滚动完全追不上**：速度上限写成了 `1.2 * delta`。`delta` 是秒，所以那是**每秒 1.2 词**，而中文语速有 4–6 字/秒——物理上恒定落后。改为 `stiffness 6` + `maxSpeed 20`（词/秒），约 3 倍正常语速
+- **走走停停的卡顿**：追到目标后把 `voiceTarget` 置 nil，引擎就停住等下一次识别。改为不清空，gap 变小速度自然降到 0，平滑停在目标处
+
+### 新增测试
+
+- `testVoiceStepKeepsUpWithNormalSpeech`：目标 5 词/秒前移时，落后不得超过 2 词（旧参数下这条必挂）
+- `testVoiceStepConvergesWithoutOvershoot`：目标静止时平滑收敛
+- `testVoiceStepHandlesLargeJump`：单帧位移受上限约束，但 10 秒内能追上 100 词跳转
+
+### 文档
+
+- 设计说明 5.6 补速度模型参数表与「`速度 * delta` 才是位移」的单位教训
+
 ## [0.6.21] - 2026-10-31
 
 跟读改为平滑滚动，默认跟读模式在重建后也能保持。

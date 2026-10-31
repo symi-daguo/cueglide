@@ -223,25 +223,22 @@ final class ScrollEngine {
             next = startPosition + (Double(totalTokens) - startPosition) * progress
 
         case .voice:
-            // 跟读模式由 SpeechTracker 通过 followVoice 设定目标，这里每帧平滑逼近。
-            // 直接 seek 会让画面「卡住 → 瞬间跳到位置」，观感不像提词器。
-            if let target = voiceTarget {
-                let gap = target - livePosition
-                if abs(gap) <= 0.35 {
-                    next = target
-                    voiceTarget = nil
-                } else {
-                    // 每秒约 2 词左右的上限，避免跳段时画面飞过去
-                    let maxStep = 1.2 * delta
-                    let step = min(abs(gap) * 6.0 * delta + 0.02, maxStep)
-                    next = livePosition + (gap > 0 ? step : -step)
-                    if abs(target - next) <= 0.35 {
-                        next = target
-                        voiceTarget = nil
-                    }
-                }
-            } else {
-                next = livePosition
+            // 跟读模式：用「速度」追目标，不是直接跳位置。
+            //
+            // 单位必须算清楚：`delta` 是秒，所以 `速度 * delta` 才是这一帧走的词数。
+            // 早期写成 `1.2 * delta` 等于每秒只走 1.2 词，而中文语速有 4–6 字/秒，
+            // 物理上永远追不上，表现就是「越来越落后」。
+            //
+            // 参数取法：
+            //   stiffness 6 —— 差 1 词就按 6 词/秒追，差得越多越快
+            //   maxSpeed 20 —— 上限 20 词/秒（约 3 倍正常语速），跳段时也不会飞过去
+            // 目标不清空：gap 变小时速度自然降下来，平滑停在目标处；
+            // 清空会让引擎停住等下一次识别，观感就是走走停停。
+            let target = voiceTarget ?? livePosition
+            next = Self.voiceStep(position: livePosition, target: target, delta: delta)
+
+            if abs(target - livePosition) < 0.05 {
+                voiceTarget = nil
             }
         }
 
@@ -263,6 +260,25 @@ final class ScrollEngine {
             frameCounter = 0
             displayPosition = next
         }
+    }
+
+    /// 跟读模式下一帧应处的位置。
+    ///
+    /// 抽成纯函数是为了能被测试覆盖：这里的单位错一次（把「每帧」当「每秒」）
+    /// 就会恒定追不上，且只在实际说话时才暴露，光看代码很难发现。
+    ///
+    /// 参数按语速取：stiffness 6 让差距 1 词时按 6 词/秒追，
+    /// maxSpeed 20 是上限（约 3 倍正常语速），跳段时也不会一闪而过。
+    static func voiceStep(
+        position: Double,
+        target: Double,
+        delta: Double,
+        stiffness: Double = 6.0,
+        maxSpeed: Double = 20.0
+    ) -> Double {
+        let gap = target - position
+        let speed = min(max(gap * stiffness, -maxSpeed), maxSpeed)
+        return position + speed * delta
     }
 
     private func finish() {
