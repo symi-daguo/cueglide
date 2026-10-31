@@ -44,3 +44,12 @@ Package.resolved
 .claude/
 .cursor/
 .trae/
+
+# 签名与证书（绝不能提交）
+*.p12
+*.cer
+*.certSigningRequest
+*.mobileprovision
+*.provisionprofile
+*.development-team
+ExportOptions.plist
