@@ -25,6 +25,9 @@ enum MemoryProbe {
             while !Task.isCancelled {
                 let line = snapshot()
                 log.info("\(line, privacy: .public)")
+                #if DEBUG
+                print("[MEM] \(line)")
+                #endif
                 try? await Task.sleep(for: .seconds(2))
             }
         }
