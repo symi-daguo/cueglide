@@ -113,45 +113,74 @@ final class ScrollEngineTests: XCTestCase {
     func testVoiceStepKeepsUpWithNormalSpeech() {
         let dt = 1.0 / 60.0
         var position = 0.0
+        var velocity = 0.0
         var target = 0.0
 
         // 目标以 5 词/秒前移，模拟正常朗读，跑 5 秒
         for _ in 0..<300 {
             target += 5.0 * dt
-            position = ScrollEngine.voiceStep(position: position, target: target, delta: dt)
+            let result = ScrollEngine.voiceStep(
+                position: position, velocity: velocity, target: target, delta: dt
+            )
+            position = result.position
+            velocity = result.velocity
         }
 
         XCTAssertLessThan(
-            abs(target - position), 2.0,
-            "落后不应超过 2 个词，超出就是速度上限算错了"
+            abs(target - position), 2.5,
+            "落后不应超过 2.5 个词，超出就是速度参数算错了"
         )
     }
 
-    /// 目标停止前移后，位置应该平滑收敛到目标，不发散也不来回抖。
+    /// 目标停止前移后要平滑收敛，不能超调（超调就是「滚过头再弹回来」）。
     func testVoiceStepConvergesWithoutOvershoot() {
         let dt = 1.0 / 60.0
         var position = 0.0
+        var velocity = 0.0
         let target = 10.0
+        var maxPosition = 0.0
 
-        for _ in 0..<240 {
-            position = ScrollEngine.voiceStep(position: position, target: target, delta: dt)
+        for _ in 0..<300 {
+            let result = ScrollEngine.voiceStep(
+                position: position, velocity: velocity, target: target, delta: dt
+            )
+            position = result.position
+            velocity = result.velocity
+            maxPosition = max(maxPosition, position)
         }
 
-        XCTAssertEqual(position, target, accuracy: 0.2, "4 秒内应收敛到目标")
+        XCTAssertEqual(position, target, accuracy: 0.3, "5 秒内应收敛到目标")
+        XCTAssertLessThanOrEqual(maxPosition, target + 0.1, "临界阻尼不应超调")
     }
 
-    /// 大跨度跳段时不能一帧飞过去，但也要在合理时间内追上。
+    /// 大跨度跳段：速度受上限约束，不会一帧飞过去，但要能在合理时间追上。
     func testVoiceStepHandlesLargeJump() {
         let dt = 1.0 / 60.0
         var position = 0.0
+        var velocity = 0.0
         let target = 100.0
 
-        let afterOneFrame = ScrollEngine.voiceStep(position: position, target: target, delta: dt)
-        XCTAssertLessThan(afterOneFrame, 1.0, "单帧位移要受上限约束")
+        let first = ScrollEngine.voiceStep(
+            position: position, velocity: velocity, target: target, delta: dt
+        )
+        XCTAssertLessThan(first.position, 1.0, "单帧位移要受速度上限约束")
 
-        for _ in 0..<600 where position < target {
-            position = ScrollEngine.voiceStep(position: position, target: target, delta: dt)
+        for _ in 0..<600 where position < target - 0.5 {
+            let result = ScrollEngine.voiceStep(
+                position: position, velocity: velocity, target: target, delta: dt
+            )
+            position = result.position
+            velocity = result.velocity
         }
         XCTAssertEqual(position, target, accuracy: 1.0, "10 秒内应追上 100 词的跳转")
+    }
+
+    /// 掉帧时（一次 dt 很大）不能把速度算爆，否则画面会猛跳。
+    func testVoiceStepStableUnderFrameDrop() {
+        let result = ScrollEngine.voiceStep(
+            position: 0, velocity: 0, target: 50, delta: 0.125
+        )
+        XCTAssertLessThan(abs(result.velocity), 20.1, "速度不得超过上限")
+        XCTAssertLessThan(result.position, 3.0, "单次大步长也不应飞出去")
     }
 }

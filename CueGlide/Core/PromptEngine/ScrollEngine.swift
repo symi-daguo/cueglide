@@ -81,6 +81,7 @@ final class ScrollEngine {
     func reset() {
         stopDisplayLink()
         voiceTarget = nil
+        voiceVelocity = 0
         isRunning = false
         isFinished = false
         countdownRemaining = 0
@@ -95,6 +96,8 @@ final class ScrollEngine {
     /// 跟读模式的目标位置。引擎每帧按固定比例逼近它，形成平滑滚动，
     /// 而不是每次命中就瞬间跳过去（那会让画面「卡住再一闪到位置」）。
     private var voiceTarget: Double?
+    /// 跟读模式的当前速度（词/秒），由弹簧积分得出，用来让滚动带惯性。
+    private var voiceVelocity: Double = 0
 
     /// 跟读命中时调用：设定目标位置并保证引擎在跑。
     func followVoice(toTokenPosition position: Double) {
@@ -103,6 +106,52 @@ final class ScrollEngine {
         if !isRunning {
             resume()
         }
+    }
+
+    /// 跟读模式下一帧的位置与速度（临界阻尼弹簧）。
+    ///
+    /// 纯比例控制（speed = gap * k）没有惯性，目标一跳速度就突变，观感是「一顿一顿」。
+    /// 换成弹簧后速度是连续积分的，目标变化时是加速/减速而不是瞬间变速。
+    ///
+    /// 参数按 Apple `Spring(response:dampingRatio:)` 换算：
+    ///   ω = 2π / response，stiffness = ω²，damping = 2ω（ratio = 1 临界阻尼，不超调）
+    ///   response 0.35s → ω ≈ 17.95 → stiffness ≈ 322，damping ≈ 36
+    static func voiceStep(
+        position: Double,
+        velocity: Double,
+        target: Double,
+        delta: Double,
+        stiffness: Double = 322,
+        damping: Double = 36,
+        maxSpeed: Double = 20
+    ) -> (position: Double, velocity: Double) {
+        // 半隐式欧拉的稳定区间约为 delta < 2/ω。掉帧时把步长切碎，
+        // 否则一次大 dt 会把速度算爆，表现是画面猛跳。
+        var remaining = min(max(delta, 0), 0.125)
+        var currentPosition = position
+        var currentVelocity = velocity
+
+        while remaining > 0 {
+            let step = min(remaining, 1.0 / 120.0)
+            let gap = target - currentPosition
+            var acceleration = stiffness * gap - damping * currentVelocity
+            var nextVelocity = currentVelocity + acceleration * step
+            nextVelocity = min(max(nextVelocity, -maxSpeed), maxSpeed)
+            var nextPosition = currentPosition + nextVelocity * step
+
+            // 临界阻尼理论上不超调，数值误差可能越界，这里兜一下
+            if (target - nextPosition) * gap < 0 {
+                nextPosition = target
+                nextVelocity = 0
+            }
+
+            currentPosition = nextPosition
+            currentVelocity = nextVelocity
+            remaining -= step
+            acceleration = 0
+        }
+
+        return (currentPosition, currentVelocity)
     }
 
     func seek(toTokenPosition position: Double) {
@@ -235,10 +284,18 @@ final class ScrollEngine {
             // 目标不清空：gap 变小时速度自然降下来，平滑停在目标处；
             // 清空会让引擎停住等下一次识别，观感就是走走停停。
             let target = voiceTarget ?? livePosition
-            next = Self.voiceStep(position: livePosition, target: target, delta: delta)
+            let result = Self.voiceStep(
+                position: livePosition,
+                velocity: voiceVelocity,
+                target: target,
+                delta: delta
+            )
+            next = result.position
+            voiceVelocity = result.velocity
 
-            if abs(target - livePosition) < 0.05 {
+            if abs(target - livePosition) < 0.05, abs(voiceVelocity) < 0.05 {
                 voiceTarget = nil
+                voiceVelocity = 0
             }
         }
 

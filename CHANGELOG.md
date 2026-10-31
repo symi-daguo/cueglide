@@ -2,6 +2,23 @@
 
 本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)，格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)。
 
+## [0.6.23] - 2026-10-31
+
+跟读滚动改用临界阻尼弹簧，去掉「一顿一顿」。
+
+### 变更
+
+- **速度控制换成弹簧积分**：此前是纯比例（`speed = gap * 6`），没有惯性，识别目标每跳一次速度就突变。现在按 Apple `Spring(response:dampingRatio:)` 换算：`ω = 2π/response`、`stiffness = ω²`、`damping = 2ω`，取 response 0.35s → stiffness 322 / damping 36（临界阻尼，不超调）
+- **掉帧时切子步**：半隐式欧拉的稳定区间约 `dt < 2/ω`（0.11s），而 `delta` 上限是 0.125s。内部按 1/120 秒切步，防止大 dt 把速度算爆导致画面猛跳
+- `voiceVelocity` 作为引擎状态，目标静止时自然衰减；「差距和速度都够小」才释放目标，避免追上就停的停顿感
+
+### 新增测试
+
+- `testVoiceStepKeepsUpWithNormalSpeech`：5 词/秒下落后 < 2.5 词
+- `testVoiceStepConvergesWithoutOvershoot`：临界阻尼不超调
+- `testVoiceStepHandlesLargeJump`：单帧受限但 10 秒内追上 100 词
+- `testVoiceStepStableUnderFrameDrop`：dt 0.125s 时速度不超上限、位移不发散
+
 ## [0.6.22] - 2026-10-31
 
 修掉跟读「永远追不上」的数量级错误。
