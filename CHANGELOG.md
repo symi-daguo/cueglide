@@ -14,7 +14,7 @@
 
 ### 资源
 
-- 6 个 imageset 放在 `Assets.xcassets/Templates/`，900×600 PNG，`Assets.car` 从 1.1MB 增至 3.5MB
+- 6 个 imageset 放在 `Assets.xcassets/Templates/`，900×600。先试过 PNG，六张共 3.19MB、包体涨到 7.6MB；转 JPEG（quality 88、progressive）后压到 0.25MB，视觉无差异，包体回落到 5.2MB
 
 ## [0.6.32] - 2026-10-31
 
