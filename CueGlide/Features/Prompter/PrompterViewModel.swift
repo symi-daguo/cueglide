@@ -329,9 +329,12 @@ final class PrompterViewModel {
 
     private func handleVoiceAdvance(_ token: Int) {
         lastKnownToken = token
-        // 不用 seek：那会让画面瞬间跳过去。followVoice 让引擎平滑追上去，
-        // 观感才像正常提词器在匀速滚动。
-        engine.followVoice(toTokenPosition: Double(token))
+        // 滚动目标领先一个词：让「下一个还没读的词」落到阅读线上，
+        // 而不是把刚读完的词停在阅读线。渲染时该词的顶部对齐阅读线，
+        // 所以不加这个偏移，用户看到的永远是「读完的那句停在线上」。
+        //
+        // 不用 seek：那会让画面瞬间跳过去。followVoice 让引擎平滑追上去。
+        engine.followVoice(toTokenPosition: Double(token) + 1.0)
     }
 
     // MARK: - 参数
@@ -364,8 +367,15 @@ final class PrompterViewModel {
     // MARK: - 状态
 
     private func handleFrame(_ position: Double) {
-        let index = Int(position.rounded())
         renderer.scroll(toTokenPosition: position, viewportHeight: viewportSize.height)
+
+        // 语音模式下滚动位置比「当前读到的词」领先一个（见 handleVoiceAdvance），
+        // 所以高亮要退回来一个，否则会高亮到还没读的词。
+        // 恒速模式下两者一致，不做偏移。
+        let index = scroll.mode == .voice
+            ? max(Int(position.rounded()) - 1, 0)
+            : Int(position.rounded())
+
         renderer.highlight(currentToken: index)
         if index != lastKnownToken {
             lastKnownToken = index
