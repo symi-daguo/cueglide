@@ -80,6 +80,7 @@ final class ScrollEngine {
 
     func reset() {
         stopDisplayLink()
+        voiceTarget = nil
         isRunning = false
         isFinished = false
         countdownRemaining = 0
@@ -89,6 +90,19 @@ final class ScrollEngine {
         startPosition = 0
         displayPosition = 0
         onFrame?(0)
+    }
+
+    /// 跟读模式的目标位置。引擎每帧按固定比例逼近它，形成平滑滚动，
+    /// 而不是每次命中就瞬间跳过去（那会让画面「卡住再一闪到位置」）。
+    private var voiceTarget: Double?
+
+    /// 跟读命中时调用：设定目标位置并保证引擎在跑。
+    func followVoice(toTokenPosition position: Double) {
+        let clamped = min(max(position, 0), Double(max(totalTokens - 1, 0)))
+        voiceTarget = clamped
+        if !isRunning {
+            resume()
+        }
     }
 
     func seek(toTokenPosition position: Double) {
@@ -209,8 +223,26 @@ final class ScrollEngine {
             next = startPosition + (Double(totalTokens) - startPosition) * progress
 
         case .voice:
-            // 跟读模式由 SpeechTracker 通过 seek 驱动，引擎本身不自动推进。
-            next = livePosition
+            // 跟读模式由 SpeechTracker 通过 followVoice 设定目标，这里每帧平滑逼近。
+            // 直接 seek 会让画面「卡住 → 瞬间跳到位置」，观感不像提词器。
+            if let target = voiceTarget {
+                let gap = target - livePosition
+                if abs(gap) <= 0.35 {
+                    next = target
+                    voiceTarget = nil
+                } else {
+                    // 每秒约 2 词左右的上限，避免跳段时画面飞过去
+                    let maxStep = 1.2 * delta
+                    let step = min(abs(gap) * 6.0 * delta + 0.02, maxStep)
+                    next = livePosition + (gap > 0 ? step : -step)
+                    if abs(target - next) <= 0.35 {
+                        next = target
+                        voiceTarget = nil
+                    }
+                }
+            } else {
+                next = livePosition
+            }
         }
 
         let upperBound = Double(max(totalTokens - 1, 0))

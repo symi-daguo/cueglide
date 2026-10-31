@@ -2,6 +2,20 @@
 
 本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)，格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)。
 
+## [0.6.21] - 2026-10-31
+
+跟读改为平滑滚动，默认跟读模式在重建后也能保持。
+
+### 修复
+
+- **跟读是「卡住然后瞬间跳到位置」，不是匀速滚动**：`handleVoiceAdvance` 调的是 `engine.seek(...)`，而 `ScrollEngine` 的 `case .voice` 本身不推进（`next = livePosition`），所以每次命中就是一次瞬间跳转。改为 `engine.followVoice(toTokenPosition:)` 设定目标，引擎每帧按比例逼近，单帧上限 1.2 token（约每秒 2 词），形成连续滚动
+- **进入提词页不是跟读模式**：视图会重建（`onAppear` 实测触发两次），重建时 `scroll.mode` 被重置回 `.constant`、tracker 状态回 `idle`。现在分三层保证——构造 `PrompterViewModel` 时就设 `.voice`；`startVoice()` 里再兜底一次 `applyScroll`；`onAppear` 延迟 600ms 启动
+- **拍摄页同样默认跟读**：`CaptureViewModel` 构造提词器时也设为 `.voice`，音频走相机分流，录制与跟读并存
+
+### 文档
+
+- 设计说明 5.6 补充：滚动为什么不能用 seek、默认模式的三层保证、视图重建这个坑
+
 ## [0.6.20] - 2026-10-31
 
 跟读进入即跟随真正生效，跟手再快一档。

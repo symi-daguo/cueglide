@@ -250,7 +250,27 @@ final class PrompterViewModel {
 
     /// 幂等开启跟读。用于进入提词页时默认进入跟随模式。
     func startVoice() {
-        guard !tracker.state.isActive else { return }
+        #if DEBUG
+        print("[Voice] startVoice 调用，当前模式=\(scroll.mode)，状态=\(tracker.state)")
+        #endif
+
+        // 兜底：不管构造时传的什么模式，这里强制切到语音。
+        // 实测 init 里设的 .voice 会被视图重建后的状态覆盖回 .constant。
+        if scroll.mode != .voice {
+            var next = scroll
+            next.mode = .voice
+            applyScroll(next)
+            #if DEBUG
+            print("[Voice] 强制切到语音模式，现状=\(scroll.mode)")
+            #endif
+        }
+
+        guard !tracker.state.isActive else {
+            #if DEBUG
+            print("[Voice] 已在跟读中，跳过")
+            #endif
+            return
+        }
         toggleVoice()
     }
 
@@ -284,6 +304,9 @@ final class PrompterViewModel {
             var next = scroll
             next.mode = .voice
             applyScroll(next)
+            #if DEBUG
+            print("[Voice] 已切到语音模式，engine.isRunning=\(engine.isRunning)")
+            #endif
             engine.seek(toTokenPosition: Double(lastKnownToken))
             showControls()
         }
@@ -306,7 +329,9 @@ final class PrompterViewModel {
 
     private func handleVoiceAdvance(_ token: Int) {
         lastKnownToken = token
-        engine.seek(toTokenPosition: Double(token))
+        // 不用 seek：那会让画面瞬间跳过去。followVoice 让引擎平滑追上去，
+        // 观感才像正常提词器在匀速滚动。
+        engine.followVoice(toTokenPosition: Double(token))
     }
 
     // MARK: - 参数

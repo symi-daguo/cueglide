@@ -15,7 +15,16 @@ struct PrompterView: View {
     /// `autoStartVoice` 默认为 true：进入提词页即进入跟随模式，
     /// 用户不需要再点一次跟读按钮。需要静默浏览时由调用方显式传 false。
     init(script: Script, display: DisplayConfig, scroll: ScrollConfig, autoStartVoice: Bool = true) {
-        _viewModel = State(initialValue: PrompterViewModel(script: script, display: display, scroll: scroll))
+        // 初始就按语音模式建 viewModel，而不是等 onAppear 再切。
+        // 视图会重建（onAppear 实测触发两次），重建时状态被重置成 idle/constant，
+        // 用户看到的就是「进来不是跟读模式」。从构造阶段定死模式才稳。
+        var effectiveScroll = scroll
+        if autoStartVoice {
+            effectiveScroll.mode = .voice
+        }
+        _viewModel = State(
+            initialValue: PrompterViewModel(script: script, display: display, scroll: effectiveScroll)
+        )
         self.autoStartVoice = autoStartVoice
     }
 
@@ -69,6 +78,9 @@ struct PrompterView: View {
                     // start 会被随后的重建打断，表现就是「进来不是跟读模式，得再点一次」。
                     Task {
                         try? await Task.sleep(for: .milliseconds(600))
+                        #if DEBUG
+                        print("[Voice] onAppear 延迟触发 startVoice")
+                        #endif
                         viewModel.startVoice()
                     }
                 }

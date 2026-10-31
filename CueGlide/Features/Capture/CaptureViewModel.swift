@@ -28,10 +28,13 @@ final class CaptureViewModel {
 
     init(script: Script, display: DisplayConfig, scroll: ScrollConfig) {
         self.script = script
+        // 拍摄页同样从构造阶段就定为语音模式，不依赖后续 startVoice 切换
+        var effectiveScroll = scroll
+        effectiveScroll.mode = .voice
         self.prompter = PrompterViewModel(
             script: script,
             display: display,
-            scroll: scroll,
+            scroll: effectiveScroll,
             captureMode: true
         )
         // 音频走相机的分流通道，录制和跟读可以同时用
@@ -58,12 +61,12 @@ final class CaptureViewModel {
             try await camera.configure(position: .front)
             camera.start()
             phase = .ready
+
+            // 拍摄页同样默认进入跟读模式：音频走相机分流，录制与跟读可以并存
+            try? await Task.sleep(for: .milliseconds(400))
+            prompter.startVoice()
+
             #if DEBUG
-            if ProcessInfo.processInfo.arguments.contains("-autoVoice") {
-                try? await Task.sleep(for: .seconds(2))
-                toggleVoice()
-                try? await Task.sleep(for: .seconds(4))
-            }
             await runAutoRecordIfRequested()
             #endif
         } catch {
