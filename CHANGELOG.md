@@ -2,6 +2,19 @@
 
 本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)，格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)。
 
+## [0.6.27] - 2026-10-31
+
+换成 3D 立体图标，补齐开源协作与测试方案。
+
+### 变更
+
+- **App 图标重做**：原先是线条图形，缩到主屏尺寸后辨识度不足。新图标是深黑底（`#0B0C0F`）上的五条玻璃横条，带真实厚度、倒角与内部折射，中间一条嵌一段翠绿高光代表「正在读的那个词」，横条向上逐级变窄暗示滚动
+- 图标规格：1024×1024 PNG，**无 alpha 通道**（App Store 硬性要求），single-size 配置由 Xcode 自动生成各尺寸
+
+### 文档
+
+- `CONTRIBUTING.md` 新增「关于署名与测试」：说明 PR 合并后 GitHub 自动列入 Contributors、可用 `users.noreply.github.com` 匿名邮箱；TestFlight 用**公开链接**，贡献者不需要交 Apple ID 或邮箱
+
 ## [0.6.26] - 2026-10-31
 
 统一桌面显示名，补齐开源用户的使用说明。
