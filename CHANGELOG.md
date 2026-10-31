@@ -2,6 +2,27 @@
 
 本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)，格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)。
 
+## [0.6.26] - 2026-10-31
+
+统一桌面显示名，补齐开源用户的使用说明。
+
+### 变更
+
+- **桌面显示名改为「提个词」**：此前 `CFBundleDisplayName` 是 `CueGlide`，与 App Store 上架名称不一致——用户装完看到的图标名和商店里不是同一个名字
+- README 补充两条使用路径：自己编译（含免费 Apple ID 的 7 天签名限制、三个 target 的 Bundle ID 都要改）、以及 App Store 版本
+
+### 与 App Store Connect 的对应关系
+
+| 项 | 值 |
+|---|---|
+| Bundle ID | `com.symi.cueglide` |
+| 显示名 | 提个词 |
+| 版本 | 0.6.26（Build 1） |
+| 设备族 | iPhone + iPad |
+| 权限 | 相机 / 麦克风 / 语音识别 / 相册（均已在 Info.plist 声明） |
+
+**注意**：每次向 App Store 上传新的构建，`CURRENT_PROJECT_VERSION` 必须递增，否则会被拒。
+
 ## [0.6.25] - 2026-10-31
 
 对齐容忍同音字错误，念了但画面不动的情况大幅减少。
