@@ -42,7 +42,7 @@ struct HomeView: View {
                     footer
                 }
                 .padding(.horizontal, 16)
-                .padding(.bottom, 96)
+                .padding(.bottom, 76)
                 .frame(maxWidth: 780)
                 .frame(maxWidth: .infinity)
             }
@@ -92,7 +92,7 @@ struct HomeView: View {
     private var header: some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(alignment: .firstTextBaseline) {
-                Text("CueGlide")
+                Text("提个词")
                     .font(.system(size: 28, weight: .bold))
                     .foregroundStyle(Theme.textPrimary)
                 Spacer()
@@ -332,14 +332,45 @@ struct HomeView: View {
     }
 
     private var footer: some View {
-        HStack(spacing: 6) {
-            Image(systemName: "lock.shield")
-                .font(.system(size: 11))
-            Text("无账号、无会员、无云端，全部数据留在本机")
-                .font(.system(size: 11))
+        VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("上手三条")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(Theme.textSecondary)
+
+                tipRow("提词页双击任意位置暂停或继续")
+                tipRow("上下滑手动找位置，左右滑改滚动速度")
+                tipRow("蓝牙翻页笔、脚踏开关、外接键盘都能控制")
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(14)
+            .background(Theme.surface, in: .rect(cornerRadius: 16))
+            .overlay {
+                RoundedRectangle(cornerRadius: 16).stroke(Theme.hairline, lineWidth: 0.5)
+            }
+
+            HStack(spacing: 6) {
+                Image(systemName: "lock.shield")
+                    .font(.system(size: 11))
+                Text("无账号、无会员、无云端，全部数据留在本机")
+                    .font(.system(size: 11))
+            }
+            .foregroundStyle(Theme.textTertiary)
         }
-        .foregroundStyle(Theme.textTertiary)
-        .padding(.top, 6)
+        .padding(.top, 4)
+    }
+
+    private func tipRow(_ text: String) -> some View {
+        HStack(alignment: .top, spacing: 8) {
+            Circle()
+                .fill(Theme.brand.opacity(0.5))
+                .frame(width: 4, height: 4)
+                .padding(.top, 6)
+            Text(text)
+                .font(.system(size: 12))
+                .foregroundStyle(Theme.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
     }
 
     private func metric(_ text: String) -> some View {
