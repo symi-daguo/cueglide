@@ -272,10 +272,10 @@ final class CameraController: NSObject, @unchecked Sendable {
                     && format.supportedColorSpaces.contains(.HLG_BT2020)
             )
         }
-        // 默认用满传感器（4:3 的 4032×3024）：像素比 4K 16:9 多 47%，取景也更接近
-        // 系统相机的前置预览。16:9 是从传感器里裁出来的，视野会窄一圈。
-        // 想回到 4K HDR（HLG 只有 16:9 格式）时用 `-use4KHDR` 启动。
-        let preferLargeSensor = !ProcessInfo.processInfo.arguments.contains("-use4KHDR")
+        // 默认走 16:9：这是手机视频的标准比例，系统相机录的也是 16:9 / 9:16。
+        // 满传感器 4:3 虽然像素更多，但出片比例不是用户预期。
+        // 需要 4:3 满视野时用 `-useLargeSensor` 启动。
+        let preferLargeSensor = ProcessInfo.processInfo.arguments.contains("-useLargeSensor")
         guard let index = preferredFormatIndex(in: options, preferLargeSensor: preferLargeSensor) else {
             return nil
         }
@@ -365,17 +365,41 @@ final class CameraController: NSObject, @unchecked Sendable {
     }
 
     private func applyRotationForCurrentInterface() {
-        guard !isRecording, let coordinator = rotationCoordinator else { return }
-
-        let angle: CGFloat
-        if #available(iOS 27, *) {
-            angle = coordinator.videoRotationAngleRelative(
-                toDeviceOrientation: Self.videoOrientation(for: lastInterfaceOrientation)
-            )
-        } else {
-            angle = coordinator.videoRotationAngleForHorizonLevelCapture
+        guard !isRecording else {
+            log.info("旋转跳过：正在录制")
+            return
         }
+        guard rotationCoordinator != nil else {
+            log.info("旋转跳过：rotationCoordinator 为空")
+            return
+        }
+
+        let angle = Self.captureAngle(for: lastInterfaceOrientation)
+        let connection = movieOutput.connection(with: .video)
+        log.info(
+            "旋转应用：界面=\(self.lastInterfaceOrientation.rawValue, privacy: .public) 角度=\(angle, privacy: .public) 支持=\(connection?.isVideoRotationAngleSupported(angle) ?? false, privacy: .public)"
+        )
         applyRotation(preview: angle, capture: angle)
+    }
+
+    /// 界面方向对应的画面旋转角。
+    ///
+    /// 不用 `videoRotationAngleRelative(toDeviceOrientation:)`：实测它对
+    /// `landscapeRight` 返回 270，那是竖屏角度，设下去画面尺寸不变。
+    /// 这里直接给角度：横屏 0 / 180 会让宽高互换，竖屏 90 / 270 保持竖构图。
+    private static func captureAngle(for orientation: UIInterfaceOrientation) -> CGFloat {
+        switch orientation {
+        case .portrait:
+            return 90
+        case .portraitUpsideDown:
+            return 270
+        case .landscapeRight:
+            return 0
+        case .landscapeLeft:
+            return 180
+        default:
+            return 90
+        }
     }
 
     #if DEBUG
@@ -604,9 +628,26 @@ final class CameraController: NSObject, @unchecked Sendable {
         }
         session.commitConfiguration()
 
-        guard movieOutput.connection(with: .video) != nil else {
+        guard let connection = movieOutput.connection(with: .video) else {
             restoreAudioOutput()
             throw CaptureError.cannotConfigure
+        }
+
+        // 刚加进 session 的连接角度是默认 0，必须立刻按当前方向写进去。
+        // 这里不能用 applyRotationForCurrentInterface：它内部走 captureQueue.async，
+        // 而下一行就 startRecording，角度还没落地就已经开录，横屏会失效。
+        let angle = Self.captureAngle(for: lastInterfaceOrientation)
+        let supported = [angle, (angle + 180).truncatingRemainder(dividingBy: 360)]
+            .first { connection.isVideoRotationAngleSupported($0) }
+        if let supported {
+            connection.videoRotationAngle = supported
+            log.info(
+                "录制角度：写入 \(supported, privacy: .public)（目标 \(angle, privacy: .public)，界面 \(self.lastInterfaceOrientation.rawValue, privacy: .public)）"
+            )
+        } else {
+            log.error(
+                "录制角度：\(angle, privacy: .public) 与 180 度偏移都不被支持，保持连接默认值"
+            )
         }
 
         let url = FileManager.default.temporaryDirectory

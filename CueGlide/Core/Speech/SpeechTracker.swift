@@ -39,6 +39,7 @@ final class SpeechTracker {
     @ObservationIgnored private let log = Logger(subsystem: "com.symi.cueglide", category: "SpeechTracker")
     @ObservationIgnored private var resultsTask: Task<Void, Never>?
     @ObservationIgnored private var externalTask: Task<Void, Never>?
+    @ObservationIgnored private var transcriptCount = 0
     @ObservationIgnored private var aligner: ScriptAligner?
     @ObservationIgnored private var accumulated = ""
     @ObservationIgnored private var anchorToken = 0
@@ -236,6 +237,12 @@ final class SpeechTracker {
 
     private func handle(transcript: String) {
         guard let aligner else { return }
+        transcriptCount += 1
+        if transcriptCount % 10 == 1 {
+            log.info(
+                "识别到文本（第 \(self.transcriptCount, privacy: .public) 段）：\(transcript.suffix(24), privacy: .public)"
+            )
+        }
         latestTranscript = transcript
 
         let normalized = ScriptTokenizer.normalize(transcript)
@@ -268,6 +275,7 @@ final class SpeechTracker {
 
     private func commit(token: Int) {
         guard token != matchedToken else { return }
+        log.info("跟读命中词索引 \(token, privacy: .public)")
         matchedToken = token
         anchorToken = token
         // 位置稳定后清空累积文本，避免旧内容持续把位置压在原地

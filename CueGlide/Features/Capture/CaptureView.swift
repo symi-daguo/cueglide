@@ -44,6 +44,12 @@ struct CaptureView: View {
                 overlayChrome
             }
             .onAppear {
+                #if DEBUG
+                if ProcessInfo.processInfo.arguments.contains("-forceLandscape") {
+                    forcedOrientation = .landscapeRight
+                    Self.requestOrientation(.landscapeRight)
+                }
+                #endif
                 prompter.configureVoice(localeIdentifier: "")
                 prompter.updateViewport(proxy.size)
                 UIApplication.shared.isIdleTimerDisabled = appSettings.keepScreenAwake
@@ -117,18 +123,6 @@ struct CaptureView: View {
                     .frame(height: 34)
                     .background(.black.opacity(0.45), in: .capsule)
                 }
-
-                // 横竖切换：不点它时跟随界面方向，点一次锁到横屏，再点恢复
-                Button {
-                    forcedOrientation = forcedOrientation == nil ? .landscapeRight : nil
-                } label: {
-                    Image(systemName: forcedOrientation == nil ? "rectangle.portrait" : "rectangle")
-                        .font(.system(size: 15, weight: .semibold))
-                        .frame(width: 44, height: 44)
-                }
-                .buttonStyle(.plain)
-                .glassEffect(.regular, in: .circle)
-                .accessibilityLabel(forcedOrientation == nil ? "锁定横屏拍摄" : "恢复跟随界面方向")
 
                 if !viewModel.isAvailable {
                     HStack(spacing: 5) {
@@ -304,6 +298,16 @@ struct CaptureView: View {
         .accessibilityValue(viewModel.isRecording ? viewModel.elapsedLabel : "")
         .disabled(viewModel.phase == .saving || !viewModel.isAvailable)
         .opacity((viewModel.phase == .saving || !viewModel.isAvailable) ? 0.4 : 1)
+    }
+
+    /// 请求界面旋转。仅调试用：`AVCaptureMovieFileOutput` 的录制方向跟设备物理方向，
+    /// 界面旋转会重建拍摄页并打断录制，所以正式流程里不提供强制横屏按钮。
+    private static func requestOrientation(_ orientation: UIInterfaceOrientationMask) {
+        guard let scene = UIApplication.shared.connectedScenes
+            .compactMap({ $0 as? UIWindowScene })
+            .first(where: { $0.activationState == .foregroundActive })
+        else { return }
+        scene.requestGeometryUpdate(.iOS(interfaceOrientations: orientation))
     }
 
     private func iconButton(

@@ -44,6 +44,8 @@ final class CameraAudioBridge: @unchecked Sendable {
     private let targetFormat: AVAudioFormat
     private var converter: AVAudioConverter?
     private var sourceFormat: AVAudioFormat?
+    private var chunkCount = 0
+    private var reportedFormat = false
     private let log = Logger(subsystem: "com.symi.cueglide", category: "CameraAudioBridge")
 
     init(targetFormat: AVAudioFormat) {
@@ -59,8 +61,24 @@ final class CameraAudioBridge: @unchecked Sendable {
         _ sampleBuffer: CMSampleBuffer,
         continuation: AsyncStream<AudioChunk>.Continuation
     ) {
-        guard let pcm = Self.pcmBuffer(from: sampleBuffer) else { return }
+        guard let pcm = Self.pcmBuffer(from: sampleBuffer) else {
+            if chunkCount == 0 { log.error("相机音频无法转成 PCM") }
+            return
+        }
+
+        if !reportedFormat {
+            reportedFormat = true
+            let targetRate = targetFormat.sampleRate
+            log.info(
+                "相机音频首帧：\(pcm.format.sampleRate, privacy: .public)Hz \(pcm.format.channelCount, privacy: .public)ch \(pcm.frameLength, privacy: .public) 帧 → 目标 \(targetRate, privacy: .public)Hz"
+            )
+        }
+
         let output = converted(pcm) ?? pcm
+        chunkCount += 1
+        if chunkCount == 50 {
+            log.info("相机音频已投递 50 帧（约 \(pcm.frameLength, privacy: .public) 帧/包）")
+        }
         continuation.yield(AudioChunk(buffer: output))
     }
 
