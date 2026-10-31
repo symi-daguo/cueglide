@@ -2,6 +2,15 @@
 
 本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)，格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)。
 
+## [0.6.12] - 2026-10-31
+
+修正横屏拍摄时画面倒转，以及前置镜像方向。
+
+### 修复
+
+- **横屏画面整体倒转**：`UIInterfaceOrientation` 与 `AVCaptureVideoOrientation` 必须**交叉**映射，我用了同名映射，差 180 度。SDK 原文：`AVCaptureVideoOrientationLandscapeRight` 是 "port on the right"，而 `UIInterfaceOrientationLandscapeLeft` 表示设备向右转；UIKit 注释也写明「rotating the device to the left requires rotating the content to the right」
+- **前置镜像方向反了**：改为与系统相机一致——**预览镜像**（自拍时看到的是镜像的自己），**成片不镜像**（别人看到的样子，画面里的文字手势都是正的）。此前两者都镜像，成片左右是反的
+
 ## [0.6.11] - 2026-10-31
 
 彻底修掉跟读闪退，修正预览被放大。

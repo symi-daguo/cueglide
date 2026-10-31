@@ -193,11 +193,11 @@ final class CameraController: NSObject, @unchecked Sendable {
             "输出状态：movie=\(self.session.outputs.contains(self.movieOutput), privacy: .public) audio=\(self.session.outputs.contains(self.audioOutput), privacy: .public) 音频输入=\(self.session.inputs.contains { ($0 as? AVCaptureDeviceInput)?.device.hasMediaType(.audio) == true }, privacy: .public)"
         )
 
-        for output in [movieOutput as AVCaptureOutput] {
-            if let connection = output.connection(with: .video),
-               connection.isVideoMirroringSupported {
-                connection.isVideoMirrored = device.position == .front
-            }
+        // 录制取真实方向，不做镜像——系统相机的前置成片就是这样，
+        // 镜像会让画面里的文字、手势全反。预览的镜像由预览层单独处理。
+        if let connection = movieOutput.connection(with: .video),
+           connection.isVideoMirroringSupported {
+            connection.isVideoMirrored = false
         }
 
         stateLock.lock()
@@ -422,6 +422,12 @@ final class CameraController: NSObject, @unchecked Sendable {
     }
     #endif
 
+    /// 界面方向 → 视频方向要**交叉**映射，不是同名。
+    ///
+    /// SDK 原文：`AVCaptureVideoOrientationLandscapeRight` 是 "port on the right"，
+    /// 而 `UIInterfaceOrientationLandscapeLeft` 表示设备向右转（Home 在右）。
+    /// UIKit 注释也写了 "rotating the device to the left requires rotating the
+    /// content to the right"。同名映射会差 180 度，表现为横屏时画面整个倒过来。
     private static func videoOrientation(
         for orientation: UIInterfaceOrientation
     ) -> AVCaptureVideoOrientation {
@@ -431,9 +437,9 @@ final class CameraController: NSObject, @unchecked Sendable {
         case .portraitUpsideDown:
             return .portraitUpsideDown
         case .landscapeLeft:
-            return .landscapeLeft
-        case .landscapeRight:
             return .landscapeRight
+        case .landscapeRight:
+            return .landscapeLeft
         default:
             // UIInterfaceOrientation 是非冻结枚举，未知值按竖屏处理
             return .portrait
@@ -557,7 +563,7 @@ final class CameraController: NSObject, @unchecked Sendable {
 
                     if let connection = self.movieOutput.connection(with: .video),
                        connection.isVideoMirroringSupported {
-                        connection.isVideoMirrored = device.position == .front
+                        connection.isVideoMirrored = false
                     }
 
                     self.stateLock.lock()
@@ -594,7 +600,7 @@ final class CameraController: NSObject, @unchecked Sendable {
         }
         if let connection = movieOutput.connection(with: .video),
            connection.isVideoMirroringSupported {
-            connection.isVideoMirrored = position == .front
+            connection.isVideoMirrored = false
         }
         session.commitConfiguration()
 

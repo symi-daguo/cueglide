@@ -387,6 +387,15 @@ private final class PreviewContainer: UIView {
         previewLayer.frame = bounds
         CATransaction.commit()
 
+        // 预览做镜像（自拍习惯），成片不镜像（由 CameraController 保证）。
+        // 系统相机就是这个行为：你看到的是镜像的自己，录出来是别人看到的样子。
+        if let connection = previewLayer.connection, connection.isVideoMirroringSupported {
+            connection.automaticallyAdjustsVideoMirroring = false
+            if !connection.isVideoMirrored {
+                connection.isVideoMirrored = true
+            }
+        }
+
         // 手动锁定优先；否则跟随界面方向。iOS 26 起 interfaceOrientation 废弃，
         // 用 effectiveGeometry 反映实际生效的方向（含分屏与方向锁定后的结果）。
         let target = forcedOrientation
