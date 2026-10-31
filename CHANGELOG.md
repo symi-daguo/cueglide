@@ -2,6 +2,19 @@
 
 本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)，格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)。
 
+## [0.6.11] - 2026-10-31
+
+彻底修掉跟读闪退，修正预览被放大。
+
+### 修复
+
+- **跟读闪退（根因是格式不是线程）**：`SpeechAnalyzer` 要求 16kHz / 单声道 / 16-bit 整数（`flags=12`），我此前用 `standardFormatWithSampleRate` 重拼成 Float32，格式不匹配时 `AnalyzerInput.init(buffer:)` 直接 `EXC_BREAKPOINT`。改成原样传递识别器返回的 `AVAudioFormat` 的 ASBD（`AudioFormatSpec`），不再自行构造
+- **预览被放大**：`videoGravity` 从 `.resizeAspectFill` 改为 `.resizeAspect`。4:3 画面填满 9:19.5 屏幕要裁掉上下近一半，看起来就是「视角被放大」，现在等比完整显示
+
+### 验证
+
+- 真机自动触发跟读：`识别器音频格式：16000.0Hz 1ch 16bit flags=12` → 接管相机音频 → 进入监听，进程存活不再崩溃
+
 ## [0.6.10] - 2026-10-31
 
 修掉跟读闪退，补上横竖切换按钮。

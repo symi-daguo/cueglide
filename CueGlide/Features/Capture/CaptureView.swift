@@ -348,7 +348,9 @@ private struct CameraPreview: UIViewRepresentable {
         view.controller = controller
         view.apply(forcedOrientation: forcedOrientation)
         view.previewLayer.session = controller.session
-        view.previewLayer.videoGravity = .resizeAspectFill
+        // 用 aspect 而不是 aspectFill：4:3 的画面填满 9:19.5 的屏幕要裁掉上下近一半，
+        // 看起来就是"被放大了"。改成等比完整显示，视野与传感器一致。
+        view.previewLayer.videoGravity = .resizeAspect
         view.layer.addSublayer(view.previewLayer)
         // 预览层要交给控制器：RotationCoordinator 的预览角度依赖它，
         // 不传的话横过来预览还是竖的。

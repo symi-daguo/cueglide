@@ -68,7 +68,7 @@ final class SpeechTracker {
     /// 开音频引擎——录制和跟读抢麦克风会录成静音。参数是采样率、声道数和投递流，
     /// 全是 Sendable，可以安全跨到采集队列。
     func start(
-        externalAudio: ((Double, AVAudioChannelCount, AsyncStream<AudioChunk>.Continuation) -> Void)? = nil
+        externalAudio: ((AudioFormatSpec, AsyncStream<AudioChunk>.Continuation) -> Void)? = nil
     ) async {
         guard state != .listening, state != .preparing else { return }
         guard let aligner, !aligner.isEmpty else {
@@ -91,7 +91,7 @@ final class SpeechTracker {
                 // AnalyzerInput 必须在主执行器上构造，采集队列直接构造会崩，
                 // 所以收裸缓冲，在这里（MainActor）再包装后投给识别器。
                 let (chunks, chunkContinuation) = AsyncStream.makeStream(of: AudioChunk.self)
-                externalAudio(format.sampleRate, format.channelCount, chunkContinuation)
+                externalAudio(AudioFormatSpec(format), chunkContinuation)
                 startExternalPump(chunks)
                 log.info("语音跟读已接管相机音频")
             } else {

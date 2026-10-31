@@ -9,6 +9,28 @@ struct AudioChunk: @unchecked Sendable {
     let buffer: AVAudioPCMBuffer
 }
 
+/// 识别器要求的音频格式描述。
+///
+/// 必须原样传递 `AVAudioFormat` 的 ASBD，不能自己用
+/// `standardFormatWithSampleRate` 重拼：识别器可能要求 Int16 或交错排列，
+/// 格式对不上时 `AnalyzerInput.init(buffer:)` 会直接断言失败。
+struct AudioFormatSpec: @unchecked Sendable {
+    let streamDescription: AudioStreamBasicDescription
+
+    init(_ format: AVAudioFormat) {
+        streamDescription = format.streamDescription.pointee
+    }
+
+    func makeFormat() -> AVAudioFormat? {
+        var description = streamDescription
+        return AVAudioFormat(streamDescription: &description)
+    }
+
+    var summary: String {
+        "\(streamDescription.mSampleRate)Hz \(streamDescription.mChannelsPerFrame)ch \(streamDescription.mBitsPerChannel)bit flags=\(streamDescription.mFormatFlags)"
+    }
+}
+
 /// 把相机采集的音频转成 `AnalyzerInput`，供 `SpeechAnalyzer` 实时识别。
 ///
 /// 存在的理由：录制和语音跟读都要麦克风，各自开一套 `AVAudioEngine` 会互相抢占，

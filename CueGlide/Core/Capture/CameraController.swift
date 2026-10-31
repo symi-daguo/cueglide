@@ -478,17 +478,14 @@ final class CameraController: NSObject, @unchecked Sendable {
     /// 参数用采样率与声道数而不是 `AVAudioFormat` 本身：后者不是 Sendable，
     /// 从主线程传给这个非隔离方法会被 Swift 6 判为数据竞争。
     func attachSpeechAudio(
-        sampleRate: Double,
-        channels: AVAudioChannelCount,
+        formatSpec: AudioFormatSpec,
         continuation: AsyncStream<AudioChunk>.Continuation
     ) {
-        guard let target = AVAudioFormat(
-            standardFormatWithSampleRate: sampleRate,
-            channels: channels
-        ) else {
-            log.error("无法构造识别器要求的音频格式")
+        guard let target = formatSpec.makeFormat() else {
+            log.error("无法重建识别器要求的音频格式")
             return
         }
+        log.info("识别器音频格式：\(formatSpec.summary, privacy: .public)")
 
         let bridge = CameraAudioBridge(targetFormat: target)
         speechBridge = bridge

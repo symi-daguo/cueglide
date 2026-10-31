@@ -32,7 +32,7 @@ final class PrompterViewModel {
     /// 拍摄时由相机提供音频：设置后跟读不再自己开音频引擎，
     /// 避免和录像抢麦克风把声音录成静音。
     @ObservationIgnored var externalAudioSource:
-        ((Double, AVAudioChannelCount, AsyncStream<AudioChunk>.Continuation) -> Void)?
+        ((AudioFormatSpec, AsyncStream<AudioChunk>.Continuation) -> Void)?
 
     enum AdjustTarget: Equatable {
         case none

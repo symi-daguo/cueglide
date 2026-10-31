@@ -36,10 +36,9 @@ final class CaptureViewModel {
         )
         // 音频走相机的分流通道，录制和跟读可以同时用
         let camera = self.camera
-        self.prompter.externalAudioSource = { sampleRate, channels, continuation in
+        self.prompter.externalAudioSource = { formatSpec, continuation in
             camera.attachSpeechAudio(
-                sampleRate: sampleRate,
-                channels: channels,
+                formatSpec: formatSpec,
                 continuation: continuation
             )
         }
