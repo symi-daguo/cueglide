@@ -35,6 +35,7 @@ final class SpeechAudioCapture {
 
     private let engine = AVAudioEngine()
     private var tapInstalled = false
+    nonisolated(unsafe) private static var tapCount = 0
     private let log = Logger(subsystem: "com.symi.cueglide", category: "SpeechAudioCapture")
 
     /// 开始采集。音频经转换后直接投递到 `continuation`，由 `SpeechAnalyzer` 消费。
@@ -127,6 +128,12 @@ final class SpeechAudioCapture {
         input.installTap(onBus: 0, bufferSize: 4096, format: format) { buffer, _ in
             let output = convert(buffer, using: converter, to: targetFormat) ?? buffer
             continuation.yield(AnalyzerInput(buffer: output))
+            #if DEBUG
+            Self.tapCount += 1
+            if Self.tapCount % 20 == 1 {
+                print("[Mic] 第 \(Self.tapCount) 包，输入 \(buffer.frameLength) 帧")
+            }
+            #endif
         }
     }
 

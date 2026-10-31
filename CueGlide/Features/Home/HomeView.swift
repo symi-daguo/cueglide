@@ -57,6 +57,12 @@ struct HomeView: View {
                     try? await Task.sleep(for: .milliseconds(400))
                     showsCapture = true
                 }
+                if ProcessInfo.processInfo.arguments.contains("-openPrompter") {
+                    try? await Task.sleep(for: .milliseconds(400))
+                    if let latest {
+                        request = PrompterRequest(script: latest, startVoice: true)
+                    }
+                }
             }
             .sheet(isPresented: $showsFloating) {
                 FloatingPrompterView()
