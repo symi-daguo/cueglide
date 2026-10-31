@@ -74,9 +74,21 @@ struct TemplatesView: View {
         } label: {
             VStack(alignment: .leading, spacing: 0) {
                 ZStack(alignment: .bottomLeading) {
-                    RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .fill(Color(uiColor: UIColor(rgb: template.accentHex)).opacity(0.14))
+                    Image(template.imageName)
+                        .resizable()
+                        .scaledToFill()
                         .frame(height: 108)
+                        .frame(maxWidth: .infinity)
+                        .clipped()
+                        .overlay(alignment: .bottom) {
+                            // 底部压暗，保证场景胶囊在任何图上都读得清
+                            LinearGradient(
+                                colors: [.clear, .black.opacity(0.5)],
+                                startPoint: .center,
+                                endPoint: .bottom
+                            )
+                        }
+                        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
 
                     Text(template.scene)
                         .font(.system(size: 10, weight: .medium))
@@ -99,7 +111,9 @@ struct TemplatesView: View {
                 Text(template.summary)
                     .font(.system(size: 11))
                     .foregroundStyle(Theme.textSecondary)
-                    .lineLimit(2)
+                    // reservesSpace 让只有一行的摘要也占两行高度，
+                    // 否则同一行网格里的卡片高度会参差不齐。
+                    .lineLimit(2, reservesSpace: true)
                     .multilineTextAlignment(.leading)
                     .padding(.top, 3)
                     .padding(.bottom, 2)

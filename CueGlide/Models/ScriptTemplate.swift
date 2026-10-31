@@ -8,6 +8,19 @@ struct ScriptTemplate: Identifiable, Hashable, Sendable {
     let summary: String
     let accentHex: UInt32
     let body: String
+
+    /// 卡片顶部配图，按模板 id 映射到资源目录里的 imageset。
+    var imageName: String {
+        switch id {
+        case "hook": "TemplateHook"
+        case "product": "TemplateProduct"
+        case "knowledge": "TemplateKnowledge"
+        case "store": "TemplateStore"
+        case "live": "TemplateLive"
+        case "story": "TemplateEmotion"
+        default: "TemplateHook"
+        }
+    }
 }
 
 enum TemplateCatalog {
